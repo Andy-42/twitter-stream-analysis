@@ -7,7 +7,6 @@ import zio.Chunk
 import scala.annotation.tailrec
 import scala.collection.mutable
 
-
 /** The summary of tweets within a given window.
  *
  * @param windowStart        The time that the tweet was created, adjusted to the start of the window

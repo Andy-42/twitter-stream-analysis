@@ -30,7 +30,6 @@ package object decoder {
     val live: ZLayer[Has[Config.Service] with EventTime, Throwable, Decoder] =
       ZLayer.fromServices[Config.Service, EventTime.Service, Decoder.Service] {
         (config, eventTime) => {
-//          implicit val runtime: URIO[ZEnv, zio.Runtime[ZEnv]] = ZIO.runtime[ZEnv]
           val photoDomains = config.summaryOutput.photoDomains
 
           new Service {
@@ -63,7 +62,8 @@ package object decoder {
         }
       }
 
-    def decodeLineToExtract(line: String): ZIO[Decoder, String, Extract] = ZIO.accessM(_.get.decodeLineToExtract(line))
+    def decodeLineToExtract(line: String): ZIO[Decoder, String, Extract] =
+      ZIO.accessM(_.get.decodeLineToExtract(line))
 
     private def getStringField(hCursor: HCursor, name: String): IO[String, String] =
       hCursor.get[String](name) match {
