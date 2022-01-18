@@ -1,7 +1,7 @@
 package andy42.twitter.config
 
-import andy42.twitter.Config._
-import andy42.twitter.ConfigDescriptors._
+import andy42.twitter.config.Config._
+import andy42.twitter.config.ConfigDescriptors._
 import zio.IO
 import zio.config._
 import zio.config.typesafe._
@@ -9,8 +9,6 @@ import zio.duration._
 import zio.test.Assertion._
 import zio.test._
 import zio.test.environment.TestEnvironment
-
-import java.net.URL
 
 object ConfigSpec extends DefaultRunnableSpec {
 
@@ -44,7 +42,7 @@ object ConfigSpec extends DefaultRunnableSpec {
         |}
         |""".stripMargin
 
-    val expected = Config(
+    val expected = Service(
       eventTime = EventTimeConfig(
         windowSize = 5.seconds,
         watermark = 15.seconds),
@@ -57,14 +55,14 @@ object ConfigSpec extends DefaultRunnableSpec {
         photoDomains = List("www.instagram.com", "pic.twitter.com")
       ),
       twitterStream = TwitterStreamConfig(
-        sampleApiUrl = new URL("https://stream.twitter.com/1.1/statuses/sample.json"),
+        sampleApiUrl = "https://stream.twitter.com/1.1/statuses/sample.json",
         apiKey = "API_KEY",
         apiKeySecret = "API_KEY_SECRET",
         accessToken = "ACCESS_TOKEN",
         accessTokenSecret = "ACCESS_TOKEN_SECRET")
     )
 
-    val result: IO[ReadError[String], Config] =
+    val result: IO[ReadError[String], Service] =
       read(configDescriptor from ConfigSource.fromHoconString(validHoconString))
 
     testM("A valid configuration can be read") {

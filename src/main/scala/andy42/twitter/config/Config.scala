@@ -1,16 +1,19 @@
-package andy42.twitter
+package andy42.twitter.config
 
+import andy42.twitter.DurationMillis
 import zio.config._
 import zio.config.magnolia._
 import zio.duration.Duration
 
-import java.net.URL
-
 object Config {
-  final case class Config(eventTime: EventTimeConfig,
-                          streamParameters: StreamParametersConfig,
-                          summaryOutput: SummaryOutputConfig,
-                          twitterStream: TwitterStreamConfig)
+
+  val configDescriptor: ConfigDescriptor[Service] =
+    descriptor[Service].mapKey(toKebabCase)
+
+  final case class Service(eventTime: EventTimeConfig,
+                           streamParameters: StreamParametersConfig,
+                           summaryOutput: SummaryOutputConfig,
+                           twitterStream: TwitterStreamConfig)
 
   final case class EventTimeConfig(windowSize: Duration,
                                    watermark: Duration) {
@@ -30,17 +33,9 @@ object Config {
     def isPhotoDomain(domain: String): Boolean = photoDomains.contains(domain)
   }
 
-  final case class TwitterStreamConfig(sampleApiUrl: URL,
+  final case class TwitterStreamConfig(sampleApiUrl: String, // TODO: Validate this as an URL
                                        apiKey: String,
                                        apiKeySecret: String,
                                        accessToken: String,
                                        accessTokenSecret: String)
-}
-
-object ConfigDescriptors {
-
-  import Config._
-
-  val configDescriptor: ConfigDescriptor[Config] =
-    descriptor[Config].mapKey(toKebabCase)
 }
