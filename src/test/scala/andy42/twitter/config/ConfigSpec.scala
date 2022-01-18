@@ -1,7 +1,6 @@
 package andy42.twitter.config
 
 import andy42.twitter.config.Config._
-import andy42.twitter.config.ConfigDescriptors._
 import zio.IO
 import zio.config._
 import zio.config.typesafe._
