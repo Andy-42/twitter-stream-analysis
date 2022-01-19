@@ -1,18 +1,17 @@
 import andy42.twitter.config.Config
-import andy42.twitter.decoder.CreateTweet.isCreateTweet
+import andy42.twitter.decoder.DecodeTransducer.decodeStringToExtract
 import andy42.twitter.decoder.Decoder
-import andy42.twitter.decoder.Decoder.decodeLineToExtract
 import andy42.twitter.eventTime.EventTime
-import andy42.twitter.output.{SummaryEmitter, WindowSummaryOutput}
+import andy42.twitter.output.SummaryEmitter
 import andy42.twitter.summarize.WindowSummarizer.addChunkToSummary
-import andy42.twitter.summarize.{EmptyWindowSummaries, WindowSummaries, WindowSummarizer}
+import andy42.twitter.summarize.{EmptyWindowSummaries, WindowSummarizer}
 import andy42.twitter.tweet.TweetStream
 import zio.clock.Clock
 import zio.config.typesafe.TypesafeConfigSource
 import zio.config.{ReadError, read}
 import zio.duration.Duration
 import zio.stream.Transducer.{splitLines, utf8Decode}
-import zio.stream.{UStream, ZStream}
+import zio.stream.ZStream
 import zio.{ExitCode, Has, URIO, ZEnv, ZIO, ZLayer}
 
 object Test extends zio.App {
@@ -46,16 +45,7 @@ object Test extends zio.App {
   val program: ZIO[Environment, Throwable, Unit] =
       TweetStream.tweetStream.flatMap { bytes =>
         bytes
-          .transduce(utf8Decode >>> splitLines)
-          // .transduce(utf8Decode >>> splitLines >>> decodeStringToExtract >>> summarizeByWindow)
-
-          // TODO: Move it to a Transducer - decodeStringToExtract
-          .filter(isCreateTweet)
-          .mapM(decodeLineToExtract)
-          .collect {
-            case Right(extract) => extract
-            // TODO: Log the Lefts
-          }
+          .transduce(utf8Decode >>> splitLines >>> decodeStringToExtract)
 
           // TODO: Move it to a Transducer - summarizeByWindow
           .groupedWithin(chunkSize = 10000, within = Duration.fromMillis(100)) // TODO: Config

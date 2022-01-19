@@ -5,16 +5,15 @@ import andy42.twitter.eventTime.EventTime
 import com.twitter.twittertext.{Extractor, TwitterTextEmojiRegex}
 import io.circe.HCursor
 import io.circe.parser._
-import zio.stream.Stream
-import zio.{Chunk, Has, IO, ZIO, ZLayer}
+import zio.{Has, ZIO, ZLayer}
 
 import java.net.URL
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success, Try}
 import scala.util.matching.Regex
+import scala.util.{Failure, Success, Try}
 
 package object decoder {
 
@@ -25,18 +24,17 @@ package object decoder {
   object Decoder {
 
     trait Service {
+      // TODO: Specific failure trait
       def decodeLineToExtract(line: String): Either[String, Extract]
-
-      def dealWithIt(in: Stream[Throwable, String]): Stream[Throwable, Extract]
     }
 
     val live: ZLayer[Has[Config.Service] with EventTime, Throwable, Decoder] =
       ZLayer.fromServices[Config.Service, EventTime.Service, Decoder.Service] {
         (config, eventTime) => {
+
           val photoDomains = config.summaryOutput.photoDomains
 
           new Service {
-
             override def decodeLineToExtract(line: String): Either[String, Extract] = {
 
               // TODO: Capture full parse failure detail, log failures
@@ -61,16 +59,6 @@ package object decoder {
                 containsPhotoUrl = urlDomains.exists(photoDomains.contains)
               )
             }
-
-            override def dealWithIt(in: Stream[Throwable, String]): Stream[Throwable, Extract] =
-              in.mapChunks {
-                _.map {
-                  line =>
-                    decodeLineToExtract(line) match {
-                      case Right(extract) => extract
-                    }
-                }
-              }
           }
         }
       }
