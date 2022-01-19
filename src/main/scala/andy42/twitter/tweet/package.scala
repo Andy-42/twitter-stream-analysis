@@ -24,6 +24,7 @@ import zio.{Has, Task, ZEnv, ZIO, ZLayer}
  *  - Manage the Blaze Client
  *  - A spurious javax.net.ssl.SSLException("closing inbound before receiving peer's close_notify")
  *    on disconnect will be logged (at debug level). This is benign, and is only log clutter.
+ *  - Upgrade to Twitter API 2.x
  */
 package object tweet {
 
@@ -56,7 +57,7 @@ package object tweet {
             tweetChunk <- response.body
           } yield tweetChunk
 
-          fs2Stream.toZStream(queueSize = 8196)
+          fs2Stream.toZStream(queueSize = 8196) // TODO: Config
         }
       }
     }
