@@ -2,7 +2,7 @@ import andy42.twitter.config.Config
 import andy42.twitter.decoder.DecodeTransducer.decodeStringToExtract
 import andy42.twitter.decoder.Decoder
 import andy42.twitter.eventTime.EventTime
-import andy42.twitter.output.SummaryEmitter
+import andy42.twitter.output.{SummaryEmitter, WindowSummaryOutput}
 import andy42.twitter.summarize.WindowSummarizer.addChunkToSummary
 import andy42.twitter.summarize.{EmptyWindowSummaries, WindowSummarizer}
 import andy42.twitter.tweet.TweetStream
@@ -38,32 +38,33 @@ object Test extends zio.App {
 
   // TODO: Why do we need Clock in the top-level environment?
   val env: ZLayer[Any, Throwable, Environment] =
-     Clock.live ++ tweetStreamLayer ++ decodeLayer ++ windowSummarizer
+    Clock.live ++ tweetStreamLayer ++ decodeLayer ++ windowSummarizer
 
   type Environment = TweetStream with Decoder with WindowSummarizer with Clock
 
-  val program: ZIO[Environment, Throwable, Unit] =
-      TweetStream.tweetStream.flatMap { bytes =>
-        bytes
-          .transduce(utf8Decode >>> splitLines >>> decodeStringToExtract)
+  val program: ZStream[WindowSummarizer with Decoder with Clock with TweetStream, Throwable, WindowSummaryOutput] =
+    ZStream.unwrap {
+      for {
+        tweetStream <- TweetStream.tweetStream
+      } yield tweetStream
+        .transduce(utf8Decode >>> splitLines >>> decodeStringToExtract)
 
-          // TODO: Move it to a Transducer - summarizeByWindow
-          .groupedWithin(chunkSize = 10000, within = Duration.fromMillis(100)) // TODO: Config
-          .mapAccumM(EmptyWindowSummaries)(addChunkToSummary)
-          .flatten
+        .groupedWithin(chunkSize = 10000, within = Duration.fromMillis(100)) // TODO: Config
+        .mapAccumM(EmptyWindowSummaries)(addChunkToSummary)
+        .flatten
 
-          .tap(x => ZIO.debug(x))
+        .tap(x => ZIO.debug(x))
 
-          .catchAll {
-            e =>
-              println(e) // TODO: Log error
-              ZStream()
-          }
-          .runDrain
-      }
+        .catchAll {
+          e =>
+            println(e) // TODO: Log error
+            ZStream()
+        }
+    }
 
   override def run(args: List[String]): URIO[ZEnv, ExitCode] =
     program
       .provideLayer(env)
+      .runDrain
       .exitCode
 }
