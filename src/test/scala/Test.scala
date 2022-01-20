@@ -1,4 +1,5 @@
 import andy42.twitter.config.Config
+import andy42.twitter.config.Config.StreamParametersConfig
 import andy42.twitter.decoder.DecodeTransducer.decodeStringToExtract
 import andy42.twitter.decoder.Decoder
 import andy42.twitter.eventTime.EventTime
@@ -11,12 +12,15 @@ import zio.config.typesafe.TypesafeConfigSource
 import zio.config.{ReadError, read}
 import zio.duration.Duration
 import zio.stream.Transducer.{splitLines, utf8Decode}
-import zio.stream.ZStream
-import zio.{ExitCode, Has, URIO, ZEnv, ZIO, ZLayer}
+import zio.stream.{Sink, ZStream}
+import zio.{ExitCode, Has, URIO, ZEnv, ZIO, ZLayer, stream}
+
+import scala.concurrent.duration.MILLISECONDS
 
 object Test extends zio.App {
 
   // TODO: Sort out E lineage here - how specific can we make it?
+  // TODO: Is it the
 
   val configLayer: ZLayer[Any, ReadError[String], Has[Config.Service]] =
     read(Config.configDescriptor from TypesafeConfigSource.fromResourcePath).toLayer
@@ -36,35 +40,50 @@ object Test extends zio.App {
   val windowSummarizer: ZLayer[Any, Throwable, WindowSummarizer] =
     (Clock.live ++ eventTimeLayer ++ summaryEmitterLayer) >>> WindowSummarizer.live
 
-  // TODO: Why do we need Clock in the top-level environment?
-  val env: ZLayer[Any, Throwable, Environment] =
-    Clock.live ++ tweetStreamLayer ++ decodeLayer ++ windowSummarizer
 
-  type Environment = TweetStream with Decoder with WindowSummarizer with Clock
+  type CustomLayer = Has[Config.Service] with TweetStream with Decoder with WindowSummarizer
 
-  val program: ZStream[WindowSummarizer with Decoder with Clock with TweetStream, Throwable, WindowSummaryOutput] =
+  val customLayer: ZLayer[Any, Throwable, CustomLayer] =
+    configLayer ++ tweetStreamLayer ++ decodeLayer ++ windowSummarizer
+
+  // TODO: Placeholder for now since config is awkward to access this in the stream program
+  val config = StreamParametersConfig(
+    extractConcurrency = 1,
+    chunkSizeLimit = 100,
+    chunkGroupTimeout = Duration(100, MILLISECONDS))
+
+  // Get the stream. Since the stream is produced in an effect, it has to be unwrapped.
+  val tweetStream: ZStream[TweetStream, Throwable, Byte] =
     ZStream.unwrap {
       for {
         tweetStream <- TweetStream.tweetStream
       } yield tweetStream
-        .transduce(utf8Decode >>> splitLines >>> decodeStringToExtract)
-
-        .groupedWithin(chunkSize = 10000, within = Duration.fromMillis(100)) // TODO: Config
-        .mapAccumM(EmptyWindowSummaries)(addChunkToSummary)
-        .flatten
-
-        .tap(x => ZIO.debug(x))
-
-        .catchAll {
-          e =>
-            println(e) // TODO: Log error
-            ZStream()
-        }
     }
+
+  val program: ZStream[CustomLayer with Clock, Throwable, WindowSummaryOutput] =
+    tweetStream
+
+      .transduce(utf8Decode >>> splitLines >>> decodeStringToExtract)
+
+      // TODO: Move this into a service so accessing config is easier
+      .groupedWithin(
+        chunkSize = config.chunkSizeLimit,
+        within = config.chunkGroupTimeout)
+      .mapAccumM(EmptyWindowSummaries)(addChunkToSummary)
+      .flatten
+
+      .tap(x => ZIO.debug(x))
+
+      .catchAll {
+        e =>
+          println(e) // TODO: Log error
+          ZStream()
+      }
+
 
   override def run(args: List[String]): URIO[ZEnv, ExitCode] =
     program
-      .provideLayer(env)
+      .provideCustomLayer(customLayer)
       .runDrain
       .exitCode
 }
