@@ -18,7 +18,7 @@ package object eventTime {
     def isExpired(createdAt: EpochMillis, now: EpochMillis): Boolean
   }
 
-  case class EventTimeLive(config: Config.Service) extends EventTime {
+  case class EventTimeLive(config: Config) extends EventTime {
     val eventTimeConfig = config.eventTime
 
     /** Move an instant (in millis) to the start of a window */
@@ -37,7 +37,7 @@ package object eventTime {
   }
 
   object EventTimeLive {
-    val layer: URLayer[Has[Config.Service], Has[EventTime]] = (EventTimeLive(_)).toLayer
+    val layer: URLayer[Has[Config], Has[EventTime]] = (EventTimeLive(_)).toLayer
   }
 
   // No accessor for EventTime since it is not used at the business logic level

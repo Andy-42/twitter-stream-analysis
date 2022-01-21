@@ -13,7 +13,7 @@ package object output {
     def emitSummary(windowSummary: WindowSummary): WindowSummaryOutput
   }
 
-  case class SummaryEmitterLive(config: Config.Service, eventTime: EventTime) extends SummaryEmitter {
+  case class SummaryEmitterLive(config: Config, eventTime: EventTime) extends SummaryEmitter {
 
     val topN = config.summaryOutput.topN
 
@@ -43,7 +43,7 @@ package object output {
   }
 
   object SummaryEmitterLive {
-    val layer: URLayer[Has[Config.Service] with Has[EventTime], Has[SummaryEmitter]] =
+    val layer: URLayer[Has[Config] with Has[EventTime], Has[SummaryEmitter]] =
       (SummaryEmitterLive(_, _)).toLayer
   }
 

@@ -24,7 +24,7 @@ package object decoder {
     def decodeLineToExtract(line: String): UIO[Either[String, Extract]]
   }
 
-  case class DecoderLive(config: Config.Service, eventTime: EventTime) extends Decoder {
+  case class DecoderLive(config: Config, eventTime: EventTime) extends Decoder {
 
     // TODO: Why the wrapping with a ZIO?
     override def decodeLineToExtract(line: String): UIO[Either[String, Extract]] = ZIO.succeed {
@@ -96,7 +96,7 @@ package object decoder {
   }
 
   object DecoderLive {
-    val layer: URLayer[Has[Config.Service] with Has[EventTime], Has[Decoder]] =
+    val layer: URLayer[Has[Config] with Has[EventTime], Has[Decoder]] =
       (DecoderLive(_, _)).toLayer
   }
 

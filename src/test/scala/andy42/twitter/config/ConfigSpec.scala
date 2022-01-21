@@ -1,6 +1,5 @@
 package andy42.twitter.config
 
-import andy42.twitter.config.Config._
 import zio.IO
 import zio.config._
 import zio.config.typesafe._
@@ -41,7 +40,7 @@ object ConfigSpec extends DefaultRunnableSpec {
         |}
         |""".stripMargin
 
-    val expected = Service(
+    val expected = ConfigTopLevel(
       eventTime = EventTimeConfig(
         windowSize = 5.seconds,
         watermark = 15.seconds),
@@ -61,8 +60,8 @@ object ConfigSpec extends DefaultRunnableSpec {
         accessTokenSecret = "ACCESS_TOKEN_SECRET")
     )
 
-    val result: IO[ReadError[String], Service] =
-      read(configDescriptor from ConfigSource.fromHoconString(validHoconString))
+    val result: IO[ReadError[String], Config] =
+      read(ConfigLive.configDescriptor from ConfigSource.fromHoconString(validHoconString))
 
     testM("A valid configuration can be read") {
       assertM(result)(equalTo(expected))

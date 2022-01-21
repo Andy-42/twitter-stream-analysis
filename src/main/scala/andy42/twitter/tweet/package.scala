@@ -1,7 +1,6 @@
 package andy42.twitter
 
-import andy42.twitter.config.Config
-import andy42.twitter.config.Config.TwitterStreamConfig
+import andy42.twitter.config.{Config, TwitterStreamConfig}
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.client.oauth1
 import org.http4s.{Method, Request}
@@ -32,7 +31,7 @@ package object tweet {
     def tweetStream: ZIO[Any, Nothing, Stream[Throwable, Byte]]
   }
 
-  case class TweetStreamLive(config: Config.Service) extends TweetStream {
+  case class TweetStreamLive(config: Config) extends TweetStream {
 
     val twitterStreamConfig: TwitterStreamConfig = config.twitterStream
 
@@ -44,7 +43,7 @@ package object tweet {
 
     override def tweetStream: ZIO[Any, Nothing, Stream[Throwable, Byte]] =
       ZIO.succeed {
-        val fs2Stream = for {
+        val fs2Stream: fs2.Stream[Task, Byte] = for {
           client <- BlazeClientBuilder[Task](runtime.platform.executor.asEC).stream
           signedRequest <- fs2.Stream.eval(signRequest)
           response <- client.stream(signedRequest)
@@ -54,6 +53,7 @@ package object tweet {
         fs2Stream.toZStream(queueSize = 8196) // TODO: Config
       }
 
+    /** Sign the request. This is effectful since signing generates a random nonce. */
     def sign(config: TwitterStreamConfig)(request: Request[Task]): Task[Request[Task]] = {
       val consumer = oauth1.Consumer(config.apiKey, config.apiKeySecret)
       val token = oauth1.Token(config.accessToken, config.accessTokenSecret)
@@ -63,7 +63,7 @@ package object tweet {
   }
 
   object TweetStreamLive {
-    val layer: URLayer[Has[Config.Service], Has[TweetStream]] =
+    val layer: URLayer[Has[Config], Has[TweetStream]] =
       (TweetStreamLive(_)).toLayer
   }
 
