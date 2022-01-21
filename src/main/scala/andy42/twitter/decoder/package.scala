@@ -5,7 +5,7 @@ import andy42.twitter.eventTime.EventTime
 import com.twitter.twittertext.{Extractor, TwitterTextEmojiRegex}
 import io.circe.HCursor
 import io.circe.parser._
-import zio.{Has, ZIO, ZLayer}
+import zio._
 
 import java.net.URL
 import java.time.Instant
@@ -19,52 +19,38 @@ package object decoder {
 
   // TODO: Collect all errors (not just first) - maybe use Validated?
 
-  type Decoder = Has[Decoder.Service]
+  trait Decoder {
+    // TODO: Specific failure trait
+    def decodeLineToExtract(line: String): UIO[Either[String, Extract]]
+  }
 
-  object Decoder {
+  case class DecoderLive(config: Config.Service, eventTime: EventTime) extends Decoder {
 
-    trait Service {
-      // TODO: Specific failure trait
-      def decodeLineToExtract(line: String): Either[String, Extract]
-    }
+    // TODO: Why the wrapping with a ZIO?
+    override def decodeLineToExtract(line: String): UIO[Either[String, Extract]] = ZIO.succeed {
 
-    val live: ZLayer[Has[Config.Service] with EventTime, Throwable, Decoder] =
-      ZLayer.fromServices[Config.Service, EventTime.Service, Decoder.Service] {
-        (config, eventTime) => {
+      // TODO: Capture full parse failure detail, log failures
 
-          val photoDomains = config.summaryOutput.photoDomains
+      // TODO: If "created_at" doesn't exist, don't attempt to parse
+      // TODO: If parsing fails for some reason, log it and filter out - use transducer instead since this is not just parsing
 
-          new Service {
-            override def decodeLineToExtract(line: String): Either[String, Extract] = {
-
-              // TODO: Capture full parse failure detail, log failures
-
-              // TODO: If "created_at" doesn't exist, don't attempt to parse
-              // TODO: If parsing fails for some reason, log it and filter out - use transducer instead since this is not just parsing
-
-              for {
-                cursor <- parse(line) match {
-                  case Left(parsingFailure) => Left(parsingFailure.message)
-                  case Right(json) => Right(json.hcursor)
-                }
-                createdAt <- getStringField(cursor, "created_at")
-                text <- getStringField(cursor, "text")
-                parsedDate <- parseDate(createdAt)
-                urlDomains <- parseUrlDomains(extractUrls(text)) // Fails if parsing any URL fails
-              } yield Extract(
-                windowStart = eventTime.toWindowStart(parsedDate),
-                hashTags = extractHashTags(text),
-                emojis = extractEmojis(text),
-                urlDomains = urlDomains,
-                containsPhotoUrl = urlDomains.exists(photoDomains.contains)
-              )
-            }
-          }
+      for {
+        cursor <- parse(line) match {
+          case Left(parsingFailure) => Left(parsingFailure.message)
+          case Right(json) => Right(json.hcursor)
         }
-      }
-
-    def decodeLineToExtract(line: String): ZIO[Decoder, Nothing, Either[String, Extract]] =
-      ZIO.access(_.get.decodeLineToExtract(line))
+        createdAt <- getStringField(cursor, "created_at")
+        text <- getStringField(cursor, "text")
+        parsedDate <- parseDate(createdAt)
+        urlDomains <- parseUrlDomains(extractUrls(text)) // Fails if parsing any URL fails
+      } yield Extract(
+        windowStart = eventTime.toWindowStart(parsedDate),
+        hashTags = extractHashTags(text),
+        emojis = extractEmojis(text),
+        urlDomains = urlDomains,
+        containsPhotoUrl = urlDomains.exists(config.summaryOutput.photoDomains.contains)
+      )
+    }
 
     private def getStringField(hCursor: HCursor, name: String): Either[String, String] =
       hCursor.get[String](name) match {
@@ -108,5 +94,14 @@ package object decoder {
           Right(urls.map(_.get.getHost))
       }
   }
-}
 
+  object DecoderLive {
+    val layer: URLayer[Has[Config.Service] with Has[EventTime], Has[Decoder]] =
+      (DecoderLive(_, _)).toLayer
+  }
+
+  object Decoder {
+    def decodeLineToExtract(line: String): ZIO[Has[Decoder], Nothing, Either[String, Extract]] =
+      ZIO.serviceWith[Decoder](_.decodeLineToExtract(line))
+  }
+}

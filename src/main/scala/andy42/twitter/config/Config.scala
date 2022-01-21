@@ -1,11 +1,14 @@
 package andy42.twitter.config
 
-import andy42.twitter.DurationMillis
 import zio.config._
 import zio.config.magnolia._
 import zio.duration.Duration
 
 object Config {
+
+  implicit val urlDescriptor: Descriptor[org.http4s.Uri] =
+    Descriptor[String].transformOrFailLeft(
+      s => org.http4s.Uri.fromString(s).swap.map(_.getMessage).swap)(url => url.toString)
 
   val configDescriptor: ConfigDescriptor[Service] =
     descriptor[Service].mapKey(toKebabCase)
@@ -16,12 +19,7 @@ object Config {
                            twitterStream: TwitterStreamConfig)
 
   final case class EventTimeConfig(windowSize: Duration,
-                                   watermark: Duration) {
-
-    def windowSizeMs: DurationMillis = windowSize.toMillis
-
-    def watermarkMs: DurationMillis = watermark.toMillis
-  }
+                                   watermark: Duration)
 
   final case class StreamParametersConfig(extractConcurrency: Int,
                                           chunkSizeLimit: Int,
@@ -33,7 +31,8 @@ object Config {
     def isPhotoDomain(domain: String): Boolean = photoDomains.contains(domain)
   }
 
-  final case class TwitterStreamConfig(sampleApiUrl: String, // TODO: Validate this as an URL
+
+  final case class TwitterStreamConfig(sampleApiUrl: org.http4s.Uri,
                                        apiKey: String,
                                        apiKeySecret: String,
                                        accessToken: String,

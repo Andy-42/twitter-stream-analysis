@@ -54,7 +54,7 @@ object ConfigSpec extends DefaultRunnableSpec {
         photoDomains = List("www.instagram.com", "pic.twitter.com")
       ),
       twitterStream = TwitterStreamConfig(
-        sampleApiUrl = "https://stream.twitter.com/1.1/statuses/sample.json",
+        sampleApiUrl = org.http4s.Uri.unsafeFromString("https://stream.twitter.com/1.1/statuses/sample.json"),
         apiKey = "API_KEY",
         apiKeySecret = "API_KEY_SECRET",
         accessToken = "ACCESS_TOKEN",

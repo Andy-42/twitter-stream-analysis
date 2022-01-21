@@ -2,12 +2,12 @@ package andy42.twitter.decoder
 
 import andy42.twitter.decoder.CreateTweet.isCreateTweet
 import andy42.twitter.decoder.Decoder.decodeLineToExtract
-import zio.{Chunk, ZIO}
 import zio.stream.ZTransducer
+import zio.{Chunk, Has, ZIO}
 
 object DecodeTransducer {
 
-  val decodeStringToExtract: ZTransducer[Decoder, Nothing, String, Extract] =
+  val decodeStringToExtract: ZTransducer[Has[Decoder], Nothing, String, Extract] =
     ZTransducer
       .fromFunctionM(decodeLineToExtract)
       .filterInput(isCreateTweet) >>>

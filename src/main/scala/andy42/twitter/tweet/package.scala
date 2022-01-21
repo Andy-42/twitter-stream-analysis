@@ -4,11 +4,11 @@ import andy42.twitter.config.Config
 import andy42.twitter.config.Config.TwitterStreamConfig
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.client.oauth1
-import org.http4s.{Method, ParseFailure, Request, Uri}
+import org.http4s.{Method, Request}
+import zio._
 import zio.interop.catz._
 import zio.stream.Stream
 import zio.stream.interop.fs2z._
-import zio.{Has, Task, ZEnv, ZIO, ZLayer}
 
 /**
  * Produces an Stream[Byte] containing tweets.
@@ -28,41 +28,31 @@ import zio.{Has, Task, ZEnv, ZIO, ZLayer}
  */
 package object tweet {
 
-  type TweetStream = Has[TweetStream.Service]
+  trait TweetStream {
+    def tweetStream: ZIO[Any, Nothing, Stream[Throwable, Byte]]
+  }
 
-  object TweetStream {
+  case class TweetStreamLive(config: Config.Service) extends TweetStream {
 
-    trait Service {
-      val tweetStream: Stream[Throwable, Byte]
-    }
+    val twitterStreamConfig: TwitterStreamConfig = config.twitterStream
 
-    val live: ZLayer[Has[Config.Service], ParseFailure, TweetStream] = ZLayer.fromServiceM { config =>
+    // Provide cats implementations to http4s/fs2
+    implicit val runtime: zio.Runtime[ZEnv] = zio.Runtime.default
 
-      val twitterStreamConfig = config.twitterStream
+    val request: Request[Task] = Request[Task](Method.GET, twitterStreamConfig.sampleApiUrl)
+    val signRequest: Task[Request[Task]] = sign(twitterStreamConfig)(request)
 
-      // Provide cats implementations to http4s/fs2
-      implicit val runtime: zio.Runtime[ZEnv] = zio.Runtime.default
+    override def tweetStream: ZIO[Any, Nothing, Stream[Throwable, Byte]] =
+      ZIO.succeed {
+        val fs2Stream = for {
+          client <- BlazeClientBuilder[Task](runtime.platform.executor.asEC).stream
+          signedRequest <- fs2.Stream.eval(signRequest)
+          response <- client.stream(signedRequest)
+          tweetChunk <- response.body
+        } yield tweetChunk
 
-      for {
-        url <- ZIO.fromEither(Uri.fromString(twitterStreamConfig.sampleApiUrl)) // TODO: Test Uri construction at config load time
-        request = Request[Task](Method.GET, url)
-        signRequest = sign(twitterStreamConfig)(request)
-      } yield new Service {
-
-        override val tweetStream: Stream[Throwable, Byte] = {
-          val fs2Stream = for {
-            client <- BlazeClientBuilder[Task](runtime.platform.executor.asEC).stream
-            signedRequest <- fs2.Stream.eval(signRequest)
-            response <- client.stream(signedRequest)
-            tweetChunk <- response.body
-          } yield tweetChunk
-
-          fs2Stream.toZStream(queueSize = 8196) // TODO: Config
-        }
+        fs2Stream.toZStream(queueSize = 8196) // TODO: Config
       }
-    }
-
-    def tweetStream: ZIO[TweetStream, Nothing, Stream[Throwable, Byte]] = ZIO.access(_.get.tweetStream)
 
     def sign(config: TwitterStreamConfig)(request: Request[Task]): Task[Request[Task]] = {
       val consumer = oauth1.Consumer(config.apiKey, config.apiKeySecret)
@@ -70,5 +60,15 @@ package object tweet {
       oauth1.signRequest(
         req = request, consumer = consumer, callback = None, verifier = None, token = Some(token))
     }
+  }
+
+  object TweetStreamLive {
+    val layer: URLayer[Has[Config.Service], Has[TweetStream]] =
+      (TweetStreamLive(_)).toLayer
+  }
+
+  object TweetStream {
+    def tweetStream: ZIO[Has[TweetStream], Nothing, Stream[Throwable, Byte]] =
+      ZIO.serviceWith[TweetStream](_.tweetStream)
   }
 }
