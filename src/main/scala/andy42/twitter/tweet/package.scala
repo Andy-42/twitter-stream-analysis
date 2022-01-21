@@ -62,7 +62,7 @@ package object tweet {
       }
     }
 
-    def tweetStream: ZIO[TweetStream, Throwable, Stream[Throwable, Byte]] = ZIO.access(_.get.tweetStream)
+    def tweetStream: ZIO[TweetStream, Nothing, Stream[Throwable, Byte]] = ZIO.access(_.get.tweetStream)
 
     def sign(config: TwitterStreamConfig)(request: Request[Task]): Task[Request[Task]] = {
       val consumer = oauth1.Consumer(config.apiKey, config.apiKeySecret)
