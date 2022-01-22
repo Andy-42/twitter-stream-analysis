@@ -10,29 +10,32 @@ import java.time.Instant
 package object output {
 
   trait SummaryEmitter {
-    def emitSummary(windowSummary: WindowSummary): WindowSummaryOutput
+    def emitSummary(windowSummary: WindowSummary): ZIO[Any, Nothing, WindowSummaryOutput]
   }
 
   case class SummaryEmitterLive(config: Config, eventTime: EventTime) extends SummaryEmitter {
 
     val topN = config.summaryOutput.topN
 
-    override def emitSummary(windowSummary: WindowSummary): WindowSummaryOutput =
-      WindowSummaryOutput(
-        windowStart = Instant.ofEpochMilli(windowSummary.windowStart).toString,
-        windowEnd = Instant.ofEpochMilli(eventTime.toWindowEnd(windowSummary.windowStart)).toString,
-        windowLastUpdate = Instant.ofEpochMilli(windowSummary.lastWindowUpdate).toString,
+    override def emitSummary(windowSummary: WindowSummary): ZIO[Any, Nothing, WindowSummaryOutput] = {
+      ZIO.succeed {
+        WindowSummaryOutput(
+          windowStart = Instant.ofEpochMilli(windowSummary.windowStart).toString,
+          windowEnd = Instant.ofEpochMilli(eventTime.toWindowEnd(windowSummary.windowStart)).toString,
+          windowLastUpdate = Instant.ofEpochMilli(windowSummary.lastWindowUpdate).toString,
 
-        tweetCountThisWindow = windowSummary.tweets,
+          tweetCountThisWindow = windowSummary.tweets,
 
-        topEmojis = top(topN, windowSummary.emojiCounts).toList,
-        topDomains = top(topN, windowSummary.domainCounts).toList,
-        topHashtags = top(topN, windowSummary.hashtagCounts).toList,
+          topEmojis = top(topN, windowSummary.emojiCounts).toList,
+          topDomains = top(topN, windowSummary.domainCounts).toList,
+          topHashtags = top(topN, windowSummary.hashtagCounts).toList,
 
-        tweetsWithEmojiPercent = 100.0 * windowSummary.tweetsWithEmoji / windowSummary.tweets,
-        tweetsWithUrlPercent = 100.0 * windowSummary.tweetsWithUrl / windowSummary.tweets,
-        tweetsWithPhotoUrlPercent = 100.0 * windowSummary.tweetsWithPhotoUrl / windowSummary.tweets
-      )
+          tweetsWithEmojiPercent = 100.0 * windowSummary.tweetsWithEmoji / windowSummary.tweets,
+          tweetsWithUrlPercent = 100.0 * windowSummary.tweetsWithUrl / windowSummary.tweets,
+          tweetsWithPhotoUrlPercent = 100.0 * windowSummary.tweetsWithPhotoUrl / windowSummary.tweets
+        )
+      }
+    }
 
     /** Get the top N values by counts in descending order. */
     def top(topN: Int, counts: Map[String, Count]): Seq[String] =
@@ -47,5 +50,8 @@ package object output {
       (SummaryEmitterLive(_, _)).toLayer
   }
 
-  // No accessor - not used at business logic level
+  object SummaryEmitter {
+    def emitSummary(windowSummary: WindowSummary): ZIO[Has[SummaryEmitter], Nothing, WindowSummaryOutput] =
+      ZIO.serviceWith[SummaryEmitter](_.emitSummary(windowSummary))
+  }
 }

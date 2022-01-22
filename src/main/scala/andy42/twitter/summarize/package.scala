@@ -2,7 +2,6 @@ package andy42.twitter
 
 import andy42.twitter.decoder.Extract
 import andy42.twitter.eventTime.EventTime
-import andy42.twitter.output.{SummaryEmitter, WindowSummaryOutput}
 import zio._
 import zio.clock.Clock
 import zio.stream.{UStream, ZStream}
@@ -17,16 +16,15 @@ package object summarize {
   trait WindowSummarizer {
     def addChunkToSummary(summariesByWindow: WindowSummaries,
                           chunk: Chunk[Extract]
-                         ): UIO[(WindowSummaries, UStream[WindowSummaryOutput])]
+                         ): UIO[(WindowSummaries, UStream[WindowSummary])]
   }
 
   case class WindowSummarizerLive(clock: Clock.Service,
-                                  eventTime: EventTime,
-                                  summaryEmitter: SummaryEmitter) extends WindowSummarizer {
+                                  eventTime: EventTime) extends WindowSummarizer {
 
     override def addChunkToSummary(summariesByWindow: WindowSummaries,
                                    tweetExtracts: Chunk[Extract]
-                                  ): UIO[(WindowSummaries, UStream[WindowSummaryOutput])] =
+                                  ): UIO[(WindowSummaries, UStream[WindowSummary])] =
       for {
         now <- clock.currentTime(MILLISECONDS)
 
@@ -38,9 +36,9 @@ package object summarize {
         }
 
         // Any summaries that are expired get reported
-        output = expired.values.map(summaryEmitter.emitSummary)
+        //output = expired.values.map(summaryEmitter.emitSummary)
 
-      } yield (ongoing, ZStream(output.toSeq: _*)) // TODO: Better ctor of stream?
+      } yield (ongoing, ZStream.fromIterable(expired.values))
 
 
     /** Update the window summaries for each distinct window start time, but only for non-expired windows. */
@@ -62,14 +60,14 @@ package object summarize {
   }
 
   object WindowSummarizerLive {
-    val layer: URLayer[Clock with Has[EventTime] with Has[SummaryEmitter], Has[WindowSummarizer]] =
-      (WindowSummarizerLive(_, _, _)).toLayer
+    val layer: URLayer[Clock with Has[EventTime], Has[WindowSummarizer]] =
+      (WindowSummarizerLive(_, _)).toLayer
   }
 
   object WindowSummarizer {
     def addChunkToSummary(summariesByWindow: WindowSummaries,
                           tweetExtracts: Chunk[Extract]
-                         ): URIO[Has[WindowSummarizer], (WindowSummaries, UStream[WindowSummaryOutput])] =
+                         ): URIO[Has[WindowSummarizer], (WindowSummaries, UStream[WindowSummary])] =
       ZIO.serviceWith[WindowSummarizer](_.addChunkToSummary(summariesByWindow, tweetExtracts))
   }
 }

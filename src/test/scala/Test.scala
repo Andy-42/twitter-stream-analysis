@@ -44,9 +44,9 @@ object Test extends zio.App {
     (Clock.live ++ eventTimeLayer ++ summaryEmitterLayer) >>> WindowSummarizerLive.layer
 
 
-  type CustomLayer = Has[TweetStream] with Has[Decoder] with Has[WindowSummarizer]
+  type CustomLayer = Has[TweetStream] with Has[Decoder] with Has[WindowSummarizer] with Has[SummaryEmitter]
 
-  val customLayer = tweetStreamLayer ++ decodeLayer ++ windowSummarizer
+  val customLayer = tweetStreamLayer ++ decodeLayer ++ windowSummarizer ++ summaryEmitterLayer
 
   // TODO: Placeholder for now since config is awkward to access this in the stream program
   val config = StreamParametersConfig(
@@ -73,34 +73,26 @@ object Test extends zio.App {
 
 
   // FIXME: What is this E1 error in the stream? Where is it coming from?
-  val program: ZIO[Any, Nothing, ZStream[CustomLayer with Clock, Nothing, WindowSummaryOutput]] =
-    for {
-      //      streamParameters <- ZIO.access[Config.Service](_.streamParameters)
-      streamParameters <- ZIO.succeed(config)
-    } yield tweetStream
-      // TODO: Will using explicit Nothing for the failure type override the E1 thing?
-      // TODO: Why doesn't a R type of Decoder work here? What am I missing?
-      // TODO: Is the problem with how Decoder.decodeStringToExtract is produced?
-      //.transduce[Decoder, Nothing, Extract](utf8Decode >>> splitLines >>> decodeStringToExtract)
-
-      // TODO: Combining the following transducers doesn't work because of the error context.
+  val program: ZStream[CustomLayer with Clock, Nothing, WindowSummaryOutput] =
+    tweetStream
+      // TODO: Combining the following transducers doesn't work because of the error context (?).
       // TODO: Specifying them in two separate `transduce` calls does work though?
-//      .transduce(utf8Decode >>> splitLines >>> decodeStringToExtract)
+      //      .transduce(utf8Decode >>> splitLines >>> decodeStringToExtract)
       .transduce(utf8Decode >>> splitLines)
       .transduce(decodeStringToExtract)
 
       .groupedWithin(
-        chunkSize = streamParameters.chunkSizeLimit,
-        within = streamParameters.chunkGroupTimeout)
+        chunkSize = config.chunkSizeLimit,
+        within = config.chunkGroupTimeout)
+
       .mapAccumM(EmptyWindowSummaries)(addChunkToSummary)
       .flatten
 
-      .tap(x => ZIO.debug(x))
+      .mapM(SummaryEmitter.emitSummary)
 
   override def run(args: List[String]): URIO[ZEnv, ExitCode] =
-    program.flatMap {
-      _.provideCustomLayer(customLayer)
-        .runDrain
-        .exitCode
-    }
+    program.provideCustomLayer(customLayer)
+      .tap(x => ZIO.debug(x))
+      .runDrain
+      .exitCode
 }

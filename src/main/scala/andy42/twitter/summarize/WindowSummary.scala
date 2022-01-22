@@ -92,7 +92,7 @@ object WindowSummary {
         m
       else {
         val k = occurrences(i)
-        m += k -> m.getOrElse(k, 0L)
+        m += k -> (m.getOrElse(k, 0L) + 1)
         accumulate(m = m, i = i + 1)
       }
 
