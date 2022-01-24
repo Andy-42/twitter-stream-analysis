@@ -19,7 +19,7 @@ package object eventTime {
   }
 
   case class EventTimeLive(config: Config) extends EventTime {
-    val eventTimeConfig = config.eventTime
+    val eventTimeConfig = config.configTopLevel.eventTime
 
     /** Move an instant (in millis) to the start of a window */
     def toWindowStart(createdAt: EpochMillis): WindowStart =

@@ -26,6 +26,8 @@ package object decoder {
 
   case class DecoderLive(config: Config, eventTime: EventTime) extends Decoder {
 
+    val photoDomains = config.configTopLevel.summaryOutput.photoDomains
+
     // TODO: Why the wrapping with a ZIO?
     override def decodeLineToExtract(line: String): UIO[Either[String, Extract]] = ZIO.succeed {
 
@@ -48,7 +50,7 @@ package object decoder {
         hashTags = extractHashTags(text),
         emojis = extractEmojis(text),
         urlDomains = urlDomains,
-        containsPhotoUrl = urlDomains.exists(config.summaryOutput.photoDomains.contains)
+        containsPhotoUrl = urlDomains.exists(photoDomains.contains)
       )
     }
 

@@ -2,24 +2,14 @@ package andy42.twitter
 
 import zio.config.typesafe.TypesafeConfigSource
 import zio.duration.Duration
-import zio.{Has, ZLayer}
+import zio.{Has, IO, ZIO, ZLayer}
 
 package object config {
-
-  trait Config {
-    def eventTime: EventTimeConfig
-
-    def streamParameters: StreamParametersConfig
-
-    def summaryOutput: SummaryOutputConfig
-
-    def twitterStream: TwitterStreamConfig
-  }
 
   final case class ConfigTopLevel(eventTime: EventTimeConfig,
                                   streamParameters: StreamParametersConfig,
                                   summaryOutput: SummaryOutputConfig,
-                                  twitterStream: TwitterStreamConfig) extends Config
+                                  twitterStream: TwitterStreamConfig)
 
   final case class EventTimeConfig(windowSize: Duration,
                                    watermark: Duration)
@@ -40,6 +30,15 @@ package object config {
                                        accessToken: String,
                                        accessTokenSecret: String)
 
+  trait Config {
+    val configTopLevel: ConfigTopLevel
+    val configTopLevelM: ZIO[Any, Nothing, ConfigTopLevel]
+  }
+
+  case class ConfigLive(configTopLevel: ConfigTopLevel) extends Config {
+    override val configTopLevelM: ZIO[Any, Nothing, ConfigTopLevel] = ZIO.succeed(configTopLevel)
+  }
+
   object ConfigLive {
 
     import zio.config._
@@ -53,6 +52,14 @@ package object config {
       descriptor[ConfigTopLevel].mapKey(toKebabCase)
 
     val layer: ZLayer[Any, ReadError[String], Has[Config]] =
-      read(configDescriptor from TypesafeConfigSource.fromResourcePath).toLayer
+      ZLayer.fromEffect {
+        for {
+          configTopLevel <- read(configDescriptor from TypesafeConfigSource.fromResourcePath)
+        } yield ConfigLive(configTopLevel)
+      }
+  }
+
+  object Config {
+    val config: ZIO[Has[Config], Nothing, ConfigTopLevel] = ZIO.serviceWith[Config](_.configTopLevelM)
   }
 }

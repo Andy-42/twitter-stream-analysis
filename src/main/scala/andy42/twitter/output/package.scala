@@ -15,7 +15,7 @@ package object output {
 
   case class SummaryEmitterLive(config: Config, eventTime: EventTime) extends SummaryEmitter {
 
-    val topN = config.summaryOutput.topN
+    val topN = config.configTopLevel.summaryOutput.topN
 
     override def emitSummary(windowSummary: WindowSummary): ZIO[Any, Nothing, WindowSummaryOutput] = {
       ZIO.succeed {

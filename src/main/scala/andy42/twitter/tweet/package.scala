@@ -33,7 +33,7 @@ package object tweet {
 
   case class TweetStreamLive(config: Config) extends TweetStream {
 
-    val twitterStreamConfig: TwitterStreamConfig = config.twitterStream
+    val twitterStreamConfig: TwitterStreamConfig = config.configTopLevel.twitterStream
 
     // Provide cats implementations to http4s/fs2
     implicit val runtime: zio.Runtime[ZEnv] = zio.Runtime.default

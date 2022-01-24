@@ -60,7 +60,7 @@ object ConfigSpec extends DefaultRunnableSpec {
         accessTokenSecret = "ACCESS_TOKEN_SECRET")
     )
 
-    val result: IO[ReadError[String], Config] =
+    val result: IO[ReadError[String], ConfigTopLevel] =
       read(ConfigLive.configDescriptor from ConfigSource.fromHoconString(validHoconString))
 
     testM("A valid configuration can be read") {
