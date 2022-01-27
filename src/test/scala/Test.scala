@@ -3,8 +3,9 @@ import andy42.twitter.decoder.DecodeTransducer.decodeStringToExtract
 import andy42.twitter.decoder.{Decoder, DecoderLive}
 import andy42.twitter.eventTime.{EventTime, EventTimeLive}
 import andy42.twitter.output.{SummaryEmitter, SummaryEmitterLive, WindowSummaryOutput}
+import andy42.twitter.summarize.SummarizeWindowTransducer.summarizeChunks
 import andy42.twitter.summarize.WindowSummarizer.addChunkToSummary
-import andy42.twitter.summarize.{EmptyWindowSummaries, WindowSummarizer, WindowSummarizerLive}
+import andy42.twitter.summarize.{EmptyWindowSummaries, SummarizeWindowTransducer, WindowSummarizer, WindowSummarizerLive}
 import andy42.twitter.tweet.{TweetStream, TweetStreamLive}
 import zio.clock.Clock
 import zio.stream.Transducer.{splitLines, utf8Decode}
@@ -32,8 +33,8 @@ object Test extends zio.App {
   val windowSummarizer: ZLayer[Any, Nothing, Has[WindowSummarizer]] =
     (Clock.live ++ eventTimeLayer ++ summaryEmitterLayer) >>> WindowSummarizerLive.layer
 
-  type CustomLayer = Has[TweetStream] with Has[Decoder] with Has[WindowSummarizer] with Has[SummaryEmitter]
-  val customLayer = tweetStreamLayer ++ decodeLayer ++ windowSummarizer ++ summaryEmitterLayer
+  type CustomLayer = Has[TweetStream] with Has[Decoder] with Has[WindowSummarizer] with Has[SummaryEmitter] with Has[EventTime]
+  val customLayer = tweetStreamLayer ++ decodeLayer ++ windowSummarizer ++ summaryEmitterLayer ++ eventTimeLayer
 
 
   // Get the stream. Since the stream is produced in an effect, it has to be unwrapped.
@@ -60,12 +61,20 @@ object Test extends zio.App {
       .transduce(utf8Decode >>> splitLines)
       .transduce(decodeStringToExtract)
 
-      .groupedWithin(
-        chunkSize = config.streamParameters.chunkSizeLimit,
-        within = config.streamParameters.chunkGroupTimeout)
+      // This implementation uses `mapAccumM` to statefully summarize the extract stream.
+      // The `groupedWithin` behaviour should be reproduced for the transducer case below.
+      // Note that groupedWithin also changes the stream from O to Chunk[O]
 
-      .mapAccumM(EmptyWindowSummaries)(addChunkToSummary)
-      .flatten
+//      .groupedWithin(
+//        chunkSize = config.streamParameters.chunkSizeLimit,
+//        within = config.streamParameters.chunkGroupTimeout)
+//      .mapAccumM(EmptyWindowSummaries)(addChunkToSummary)
+//      .flatten
+
+      // The transducer implementation is certainly more concise,
+      // and it doesn't need the extra `flatten` needed with the `mapAccumM` implementation.
+      // The semantics of groupedWithin(chunkSize, within) needs to be implemented.
+      .transduce(summarizeChunks)
 
       .mapM(SummaryEmitter.emitSummary)
 

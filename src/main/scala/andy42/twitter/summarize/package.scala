@@ -4,10 +4,8 @@ import andy42.twitter.decoder.Extract
 import andy42.twitter.eventTime.EventTime
 import zio._
 import zio.clock.Clock
-import zio.clock.currentTime
-import zio.stream.{Transducer, UStream, ZStream, ZTransducer}
+import zio.stream.{UStream, ZStream}
 
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeUnit.MILLISECONDS
 
 package object summarize {
@@ -19,8 +17,6 @@ package object summarize {
     def addChunkToSummary(summariesByWindow: WindowSummaries,
                           chunk: Chunk[Extract]
                          ): UIO[(WindowSummaries, UStream[WindowSummary])]
-
-    def summarizeChunks: ZTransducer[Clock, Nothing, Extract, WindowSummary]
   }
 
   case class WindowSummarizerLive(clock: Clock.Service,
@@ -59,44 +55,6 @@ package object summarize {
 
       summariesByWindow ++ updatedOrNewSummaries
     }
-
-    override def summarizeChunks: ZTransducer[Clock, Nothing, Extract, WindowSummary] =
-      ZTransducer {
-        for {
-          stateRef <- ZRef.makeManaged[WindowSummaries](EmptyWindowSummaries)
-          now <- ZManaged.fromEffect(currentTime(TimeUnit.MILLISECONDS)) // FIXME: Is this right?
-        } yield {
-          case None =>
-
-            stateRef.modify { windowSummaries =>
-              if (windowSummaries.isEmpty) {
-                Chunk.empty -> EmptyWindowSummaries
-              } else {
-                val (expired, ongoing) = partitionExpiredAndOngoing(windowSummaries, now)
-                Chunk.fromIterable(expired.values) -> ongoing
-              }
-            }
-
-          case Some(chunk: Chunk[Extract]) =>
-            stateRef.modify { windowSummaries =>
-              val (expired, ongoing) = partitionExpiredAndOngoing(windowSummaries, now)
-              val updatedSummaries = updateSummaries(
-                summariesByWindow = ongoing,
-                chunk.filter(extract => !eventTime.isExpired(createdAt = extract.windowStart, now = now)),
-                now = now)
-
-              Chunk.fromIterable(expired.values) -> updatedSummaries
-            }
-        }
-      }
-
-    def partitionExpiredAndOngoing(summariesByWindow: WindowSummaries,
-                                   now: EpochMillis
-                                  ): (WindowSummaries, WindowSummaries) =
-      summariesByWindow.partition {
-        case (windowStart, _) =>
-          eventTime.isExpired(createdAt = windowStart, now = now)
-      }
   }
 
   object WindowSummarizerLive {
