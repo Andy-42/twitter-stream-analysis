@@ -20,13 +20,12 @@ libraryDependencies ++= Seq(
   "dev.zio" %% "zio-streams" % zioVersion,
   "dev.zio" %% "zio-interop-cats" % "2.5.1.0",
 
-//  "dev.zio" %% "zio-json" % "0.3.0-RC1-1",
-
+  //  "dev.zio" %% "zio-json" % "0.3.0-RC1-1",
   //  "dev.zio" %% "zio-logging" % "0.5.14",
 
-    "io.circe" %% "circe-core" % circeVersion,
-    "io.circe" %% "circe-generic" % circeVersion,
-    "io.circe" %% "circe-parser" % circeVersion,
+  "io.circe" %% "circe-core" % circeVersion,
+  "io.circe" %% "circe-generic" % circeVersion,
+  "io.circe" %% "circe-parser" % circeVersion,
 
   "com.twitter.twittertext" % "twitter-text" % "3.1.0",
 
@@ -34,4 +33,4 @@ libraryDependencies ++= Seq(
   "dev.zio" %% "zio-test-sbt" % zioVersion % Test
 )
 
-// Compile / run / mainClass := Some("andy42.de.Mission1")
+//Compile / run / mainClass := Some("andy42.twitter.config.Test")
