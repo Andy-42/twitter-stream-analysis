@@ -7,17 +7,17 @@ package object eventTime {
 
   trait EventTime {
     /** Move an instant (in millis) to the start of a window */
-    def toWindowStart(createdAt: EpochMillis): WindowStart
+    def toWindowStart(instant: EpochMillis): WindowStart
 
-    def toWindowEnd(createdAt: EpochMillis): EpochMillis
+    def toWindowEnd(instant: EpochMillis): EpochMillis
 
     /** Does an instant (in millis) fall into a fully-expired window?
      * We compare the instant that the window ends to the watermark position (relative to now):
      * if the end of the window is before the watermark, that window is fully expired.
      */
-    def isExpired(createdAt: EpochMillis, now: EpochMillis): Boolean
+    def isExpired(instant: EpochMillis, now: EpochMillis): Boolean
 
-    def isExpiredX(now: EpochMillis): ZIO[Any, Nothing, EpochMillis => Boolean]
+    def isExpired(now: EpochMillis): ZIO[Any, Nothing, EpochMillis => Boolean]
   }
 
   case class EventTimeLive(config: Config) extends EventTime {
@@ -25,20 +25,20 @@ package object eventTime {
     val watermark = config.configTopLevel.eventTime.watermark.toMillis
 
     /** Move an instant (in millis) to the start of a window */
-    override def toWindowStart(createdAt: EpochMillis): WindowStart =
-      createdAt - (createdAt % windowSize)
+    override def toWindowStart(instant: EpochMillis): WindowStart =
+      instant - (instant % windowSize)
 
-    override def toWindowEnd(createdAt: EpochMillis): EpochMillis =
-      toWindowStart(createdAt) + windowSize - 1
+    override def toWindowEnd(instant: EpochMillis): EpochMillis =
+      toWindowStart(instant) + windowSize - 1
 
     /** Does an instant (in millis) fall into a fully-expired window?
      * We compare the instant that the window ends to the watermark position (relative to now):
      * if the end of the window is before the watermark, that window is fully expired.
      */
-    override def isExpired(createdAt: EpochMillis, now: EpochMillis): Boolean =
-      toWindowEnd(createdAt) < (now - watermark)
+    override def isExpired(instant: EpochMillis, now: EpochMillis): Boolean =
+      toWindowEnd(instant) < (now - watermark)
 
-    override def isExpiredX(now: EpochMillis): ZIO[Any, Nothing, EpochMillis => Boolean] =
+    override def isExpired(now: EpochMillis): ZIO[Any, Nothing, EpochMillis => Boolean] =
       ZIO.succeed((createdAt: EpochMillis) => isExpired(createdAt, now))
   }
 
@@ -47,8 +47,8 @@ package object eventTime {
   }
 
   object EventTime {
-    // TODO: Rename
-    def isExpiredX(createdAt: EpochMillis): ZIO[Has[EventTime], Nothing, EpochMillis => Boolean] =
-      ZIO.serviceWith[EventTime](_.isExpiredX(createdAt))
+    // TODO: Rename - distinguish the pure uncurried form from the configured curried form
+    def isExpired(now: EpochMillis): ZIO[Has[EventTime], Nothing, EpochMillis => Boolean] =
+      ZIO.serviceWith[EventTime](_.isExpired(now))
   }
 }

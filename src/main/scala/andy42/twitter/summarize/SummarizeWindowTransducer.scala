@@ -3,7 +3,7 @@ package andy42.twitter.summarize
 import andy42.twitter.EpochMillis
 import andy42.twitter.decoder.Extract
 import andy42.twitter.eventTime.EventTime
-import andy42.twitter.eventTime.EventTime.isExpiredX
+import andy42.twitter.eventTime.EventTime.isExpired
 import zio.clock.{Clock, currentTime}
 import zio.stream.ZTransducer
 import zio.{Chunk, Has, ZRef}
@@ -18,7 +18,7 @@ object SummarizeWindowTransducer {
         (maybeChunk: Option[Chunk[Extract]]) =>
           for {
             now <- currentTime(TimeUnit.MILLISECONDS)
-            isExpired <- isExpiredX(now)
+            isExpired <- isExpired(now)
             nextOutputChunk <- stateRef.modify { windowSummaries =>
 
               val (expired, ongoing) = windowSummaries.partition {

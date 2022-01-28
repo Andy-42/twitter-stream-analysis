@@ -28,17 +28,18 @@ package object summarize {
       for {
         now <- clock.currentTime(MILLISECONDS)
 
-        updatedSummaries = updateSummaries(summariesByWindow, tweetExtracts, now)
-
-        // Separate expired windows from windows for which collection is ongoing
-        (expired, ongoing) = updatedSummaries.partition { case (windowStart, _) =>
-          eventTime.isExpired(createdAt = windowStart, now = now)
+        (expired, ongoing) = summariesByWindow.partition {
+          case (windowStart, _) => eventTime.isExpired(windowStart, now)
         }
 
-        // Any summaries that are expired get reported
-        //output = expired.values.map(summaryEmitter.emitSummary)
+        updatedSummaries = updateSummaries(
+          summariesByWindow = ongoing,
+          tweetExtracts = tweetExtracts.filter(extract => !eventTime.isExpired(extract.windowStart, now)),
+          now = now)
 
-      } yield (ongoing, ZStream.fromIterable(expired.values))
+      } yield (updatedSummaries, ZStream.fromIterable(expired.values))
+
+    // TODO: This code is shared with SummarizeWindowTransducer.
 
     /** Update the window summaries for each distinct window start time, but only for non-expired windows. */
     def updateSummaries(summariesByWindow: WindowSummaries,
@@ -46,7 +47,6 @@ package object summarize {
                         now: EpochMillis): WindowSummaries = {
       val updatedOrNewSummaries = for {
         windowStart <- tweetExtracts.iterator.map(_.windowStart).distinct
-        if !eventTime.isExpired(createdAt = windowStart, now = now)
 
         previousSummaryForWindow = summariesByWindow.getOrElse(
           key = windowStart, default = WindowSummary(windowStart = windowStart, now = now))
