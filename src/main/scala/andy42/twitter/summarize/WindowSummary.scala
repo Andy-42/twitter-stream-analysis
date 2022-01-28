@@ -6,6 +6,7 @@ import zio.Chunk
 
 import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.math.max
 
 /** The summary of tweets within a given window.
  *
@@ -39,7 +40,7 @@ case class WindowSummary(windowStart: WindowStart,
 
     WindowSummary(
       windowStart = windowStart,
-      lastWindowUpdate = now,
+      lastWindowUpdate = max(lastWindowUpdate, now),
       tweets = tweets + tweetExtracts.size,
 
       tweetsWithEmoji = tweetsWithEmoji + tweetsInThisWindow.count(_.containsEmoji),
