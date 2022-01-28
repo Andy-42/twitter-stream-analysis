@@ -21,21 +21,22 @@ package object eventTime {
   }
 
   case class EventTimeLive(config: Config) extends EventTime {
-    val eventTimeConfig = config.configTopLevel.eventTime
+    val windowSize = config.configTopLevel.eventTime.windowSize.toMillis
+    val watermark = config.configTopLevel.eventTime.watermark.toMillis
 
     /** Move an instant (in millis) to the start of a window */
     override def toWindowStart(createdAt: EpochMillis): WindowStart =
-      createdAt - (createdAt % eventTimeConfig.windowSize.toMillis)
+      createdAt - (createdAt % windowSize)
 
     override def toWindowEnd(createdAt: EpochMillis): EpochMillis =
-      toWindowStart(createdAt) + eventTimeConfig.windowSize.toMillis - 1
+      toWindowStart(createdAt) + windowSize - 1
 
     /** Does an instant (in millis) fall into a fully-expired window?
      * We compare the instant that the window ends to the watermark position (relative to now):
      * if the end of the window is before the watermark, that window is fully expired.
      */
     override def isExpired(createdAt: EpochMillis, now: EpochMillis): Boolean =
-      toWindowEnd(createdAt) < (now - eventTimeConfig.watermark.toMillis)
+      toWindowEnd(createdAt) < (now - watermark)
 
     override def isExpiredX(now: EpochMillis): ZIO[Any, Nothing, EpochMillis => Boolean] =
       ZIO.succeed((createdAt: EpochMillis) => isExpired(createdAt, now))

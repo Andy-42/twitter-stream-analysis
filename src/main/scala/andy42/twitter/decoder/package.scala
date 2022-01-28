@@ -26,7 +26,7 @@ package object decoder {
 
   case class DecoderLive(config: Config, eventTime: EventTime) extends Decoder {
 
-    val photoDomains: Seq[String] = config.configTopLevel.summaryOutput.photoDomains
+    val photoDomains: Set[String] = config.configTopLevel.summaryOutput.photoDomains.toSet
 
     // TODO: Why the wrapping with a ZIO?
     override def decodeLineToExtract(line: String): UIO[Either[String, Extract]] = ZIO.succeed {

@@ -39,7 +39,7 @@ package object tweet {
     implicit val runtime: zio.Runtime[ZEnv] = zio.Runtime.default
 
     val request: Request[Task] = Request[Task](Method.GET, twitterStreamConfig.sampleApiUrl)
-    val signRequest: Task[Request[Task]] = sign(twitterStreamConfig)(request)
+    val signRequest: Task[Request[Task]] = sign(request)
 
     override def tweetStream: ZIO[Any, Nothing, Stream[Throwable, Byte]] =
       ZIO.succeed {
@@ -54,9 +54,9 @@ package object tweet {
       }
 
     /** Sign the request. This is effectful since signing generates a random nonce. */
-    def sign(config: TwitterStreamConfig)(request: Request[Task]): Task[Request[Task]] = {
-      val consumer = oauth1.Consumer(config.apiKey, config.apiKeySecret)
-      val token = oauth1.Token(config.accessToken, config.accessTokenSecret)
+    def sign(request: Request[Task]): Task[Request[Task]] = {
+      val consumer = oauth1.Consumer(twitterStreamConfig.apiKey, twitterStreamConfig.apiKeySecret)
+      val token = oauth1.Token(twitterStreamConfig.accessToken, twitterStreamConfig.accessTokenSecret)
       oauth1.signRequest(
         req = request, consumer = consumer, callback = None, verifier = None, token = Some(token))
     }
