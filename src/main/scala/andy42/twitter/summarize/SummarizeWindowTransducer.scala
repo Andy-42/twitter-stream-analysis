@@ -15,56 +15,44 @@ object SummarizeWindowTransducer {
   val summarizeChunks: ZTransducer[Clock with Has[EventTime], Nothing, Extract, WindowSummary] =
     ZTransducer {
       ZRef.makeManaged[WindowSummaries](EmptyWindowSummaries).map { stateRef =>
-        (inputMaybeChunk: Option[Chunk[Extract]]) =>
+        (maybeChunk: Option[Chunk[Extract]]) =>
           for {
             now <- currentTime(TimeUnit.MILLISECONDS)
             isExpired <- isExpiredX(now)
             nextOutputChunk <- stateRef.modify { windowSummaries =>
-              inputMaybeChunk match {
+
+              val (expired, ongoing) = windowSummaries.partition {
+                case (windowStart, _) => isExpired(windowStart)
+              }
+
+              maybeChunk match {
 
                 case None =>
-                  if (windowSummaries.isEmpty) {
-                    Chunk.empty -> EmptyWindowSummaries
-                  } else {
-                    val (expired, ongoing) = partitionExpiredAndOngoing(windowSummaries, isExpired)
+                  Chunk.fromIterable(expired.values) -> ongoing
 
-                    Chunk.fromIterable(expired.values) -> ongoing
-                  }
-
-                case Some(chunk: Chunk[Extract]) =>
-                  val (expired, ongoing) = partitionExpiredAndOngoing(windowSummaries, isExpired)
-
-                  val updatedSummaries = updateSummaries(
-                    summariesByWindow = ongoing,
-                    chunk.filter(extract => !isExpired(extract.windowStart)), // Don't update expired windows
+                case Some(chunk) =>
+                  Chunk.fromIterable(expired.values) -> updateSummaries(
+                    windowSummaries = ongoing,
+                    tweetExtracts = chunk.filter(extract => !isExpired(extract.windowStart)),
                     now = now)
-
-                  Chunk.fromIterable(expired.values) -> updatedSummaries
               }
             }
           } yield nextOutputChunk
       }
     }
 
-  def partitionExpiredAndOngoing(summariesByWindow: WindowSummaries,
-                                 isExpired: EpochMillis => Boolean
-                                ): (WindowSummaries, WindowSummaries) =
-    summariesByWindow.partition {
-      case (windowStart, _) => isExpired(windowStart)
-    }
-
   /** Update the window summaries for each distinct window start time, but only for non-expired windows. */
-  def updateSummaries(summariesByWindow: WindowSummaries,
+  def updateSummaries(windowSummaries: WindowSummaries,
                       tweetExtracts: Chunk[Extract],
                       now: EpochMillis): WindowSummaries = {
     val updatedOrNewSummaries = for {
       windowStart <- tweetExtracts.iterator.map(_.windowStart).distinct
 
-      previousSummaryForWindow = summariesByWindow.getOrElse(
+      previousSummaryForWindow = windowSummaries.getOrElse(
         key = windowStart, default = WindowSummary(windowStart = windowStart, now = now))
 
     } yield windowStart -> previousSummaryForWindow.add(tweetExtracts, now)
 
-    summariesByWindow ++ updatedOrNewSummaries
+    windowSummaries ++ updatedOrNewSummaries
   }
 }

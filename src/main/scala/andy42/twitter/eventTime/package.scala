@@ -46,6 +46,7 @@ package object eventTime {
   }
 
   object EventTime {
+    // TODO: Rename
     def isExpiredX(createdAt: EpochMillis): ZIO[Has[EventTime], Nothing, EpochMillis => Boolean] =
       ZIO.serviceWith[EventTime](_.isExpiredX(createdAt))
   }
