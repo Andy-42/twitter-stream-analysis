@@ -27,14 +27,15 @@ package object summarize {
                                   ): UIO[(WindowSummaries, UStream[WindowSummary])] =
       for {
         now <- clock.currentTime(MILLISECONDS)
+        isExpired <- eventTime.isExpired(now)
 
         (expired, ongoing) = summariesByWindow.partition {
-          case (windowStart, _) => eventTime.isExpired(windowStart, now)
+          case (windowStart, _) => isExpired(windowStart)
         }
 
         updatedSummaries = updateSummaries(
           summariesByWindow = ongoing,
-          tweetExtracts = tweetExtracts.filter(extract => !eventTime.isExpired(extract.windowStart, now)),
+          tweetExtracts = tweetExtracts.filter(extract => !isExpired(extract.windowStart)),
           now = now)
 
       } yield (updatedSummaries, ZStream.fromIterable(expired.values))

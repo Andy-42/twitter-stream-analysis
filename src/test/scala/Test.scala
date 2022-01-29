@@ -55,7 +55,7 @@ object Test extends zio.App {
 
   val tweetSummaryProgram: ZIO[Has[Config], Nothing, ZStream[CustomLayer with Clock, Nothing, WindowSummaryOutput]] =
     for {
-      config <- Config.config
+      streamParameters <- Config.streamParameters
     } yield tweetStream
       // TODO: If these transducers are combined, it confuses the presentation compiler
       .transduce(utf8Decode >>> splitLines)
@@ -65,16 +65,16 @@ object Test extends zio.App {
       // The `groupedWithin` behaviour should be reproduced for the transducer case below.
       // Note that groupedWithin also changes the stream from O to Chunk[O]
 
-      .groupedWithin(
-        chunkSize = config.streamParameters.chunkSizeLimit,
-        within = config.streamParameters.chunkGroupTimeout)
-      .mapAccumM(EmptyWindowSummaries)(addChunkToSummary)
-      .flatten
+//      .groupedWithin(
+//        chunkSize = streamParameters.chunkSizeLimit,
+//        within = streamParameters.chunkGroupTimeout)
+//      .mapAccumM(EmptyWindowSummaries)(addChunkToSummary)
+//      .flatten
 
       // The transducer implementation is certainly more concise,
       // and it doesn't need the extra `flatten` needed with the `mapAccumM` implementation.
       // The semantics of groupedWithin(chunkSize, within) needs to be implemented.
-//      .transduce(summarizeChunks)
+            .transduce(summarizeChunks)
 
       .mapM(SummaryEmitter.emitSummary)
 

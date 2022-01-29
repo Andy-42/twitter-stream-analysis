@@ -10,32 +10,31 @@ import java.time.Instant
 package object output {
 
   trait SummaryEmitter {
-    def emitSummary(windowSummary: WindowSummary): ZIO[Any, Nothing, WindowSummaryOutput]
+    def emitSummary(windowSummary: WindowSummary): UIO[WindowSummaryOutput]
   }
 
   case class SummaryEmitterLive(config: Config, eventTime: EventTime) extends SummaryEmitter {
 
-    val topN = config.configTopLevel.summaryOutput.topN
+    override def emitSummary(windowSummary: WindowSummary): UIO[WindowSummaryOutput] =
+      for {
+        summaryOutput <- config.summaryOutput
+        topN = summaryOutput.topN
+        toWindowEnd <- eventTime.toWindowEnd
+      } yield WindowSummaryOutput(
+        windowStart = Instant.ofEpochMilli(windowSummary.windowStart).toString,
+        windowEnd = Instant.ofEpochMilli(toWindowEnd(windowSummary.windowStart)).toString,
+        windowLastUpdate = Instant.ofEpochMilli(windowSummary.lastWindowUpdate).toString,
 
-    override def emitSummary(windowSummary: WindowSummary): ZIO[Any, Nothing, WindowSummaryOutput] = {
-      ZIO.succeed {
-        WindowSummaryOutput(
-          windowStart = Instant.ofEpochMilli(windowSummary.windowStart).toString,
-          windowEnd = Instant.ofEpochMilli(eventTime.toWindowEnd(windowSummary.windowStart)).toString,
-          windowLastUpdate = Instant.ofEpochMilli(windowSummary.lastWindowUpdate).toString,
+        tweetCountThisWindow = windowSummary.tweets,
 
-          tweetCountThisWindow = windowSummary.tweets,
+        topEmojis = top(topN, windowSummary.emojiCounts).toList,
+        topDomains = top(topN, windowSummary.domainCounts).toList,
+        topHashtags = top(topN, windowSummary.hashtagCounts).toList,
 
-          topEmojis = top(topN, windowSummary.emojiCounts).toList,
-          topDomains = top(topN, windowSummary.domainCounts).toList,
-          topHashtags = top(topN, windowSummary.hashtagCounts).toList,
-
-          tweetsWithEmojiPercent = 100.0 * windowSummary.tweetsWithEmoji / windowSummary.tweets,
-          tweetsWithUrlPercent = 100.0 * windowSummary.tweetsWithUrl / windowSummary.tweets,
-          tweetsWithPhotoUrlPercent = 100.0 * windowSummary.tweetsWithPhotoUrl / windowSummary.tweets
-        )
-      }
-    }
+        tweetsWithEmojiPercent = 100.0 * windowSummary.tweetsWithEmoji / windowSummary.tweets,
+        tweetsWithUrlPercent = 100.0 * windowSummary.tweetsWithUrl / windowSummary.tweets,
+        tweetsWithPhotoUrlPercent = 100.0 * windowSummary.tweetsWithPhotoUrl / windowSummary.tweets
+      )
 
     /** Get the top N values by counts in descending order. */
     def top(topN: Int, counts: Map[String, Count]): Seq[String] =

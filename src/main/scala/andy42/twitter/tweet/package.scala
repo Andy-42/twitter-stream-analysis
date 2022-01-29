@@ -4,7 +4,7 @@ import andy42.twitter.config.{Config, TwitterStreamConfig}
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.client.oauth1
 import org.http4s.{Method, Request}
-import zio._
+import zio.{Task, _}
 import zio.interop.catz._
 import zio.stream.Stream
 import zio.stream.interop.fs2z._
@@ -28,21 +28,20 @@ import zio.stream.interop.fs2z._
 package object tweet {
 
   trait TweetStream {
-    def tweetStream: ZIO[Any, Nothing, Stream[Throwable, Byte]]
+    def tweetStream: UIO[Stream[Throwable, Byte]]
   }
 
   case class TweetStreamLive(config: Config) extends TweetStream {
 
-    val twitterStreamConfig: TwitterStreamConfig = config.configTopLevel.twitterStream
-
     // Provide cats implementations to http4s/fs2
     implicit val runtime: zio.Runtime[ZEnv] = zio.Runtime.default
 
-    val request: Request[Task] = Request[Task](Method.GET, twitterStreamConfig.sampleApiUrl)
-    val signRequest: Task[Request[Task]] = sign(request)
-
-    override def tweetStream: ZIO[Any, Nothing, Stream[Throwable, Byte]] =
-      ZIO.succeed {
+    override def tweetStream: UIO[Stream[Throwable, Byte]] = {
+      for {
+        twitterStream <- config.twitterStream
+        request = Request[Task](Method.GET, twitterStream.sampleApiUrl)
+        signRequest = sign(request)(twitterStream)
+      } yield {
         val fs2Stream: fs2.Stream[Task, Byte] = for {
           client <- BlazeClientBuilder[Task](runtime.platform.executor.asEC).stream
           signedRequest <- fs2.Stream.eval(signRequest)
@@ -52,9 +51,10 @@ package object tweet {
 
         fs2Stream.toZStream(queueSize = 8196) // TODO: Config
       }
+    }
 
     /** Sign the request. This is effectful since signing generates a random nonce. */
-    def sign(request: Request[Task]): Task[Request[Task]] = {
+    def sign(request: Request[Task])(twitterStreamConfig: TwitterStreamConfig): Task[Request[Task]] = {
       val consumer = oauth1.Consumer(twitterStreamConfig.apiKey, twitterStreamConfig.apiKeySecret)
       val token = oauth1.Token(twitterStreamConfig.accessToken, twitterStreamConfig.accessTokenSecret)
       oauth1.signRequest(
@@ -68,7 +68,7 @@ package object tweet {
   }
 
   object TweetStream {
-    def tweetStream: ZIO[Has[TweetStream], Nothing, Stream[Throwable, Byte]] =
+    def tweetStream: URIO[Has[TweetStream], Stream[Throwable, Byte]] =
       ZIO.serviceWith[TweetStream](_.tweetStream)
   }
 }

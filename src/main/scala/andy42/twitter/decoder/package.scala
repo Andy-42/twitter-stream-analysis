@@ -26,33 +26,33 @@ package object decoder {
 
   case class DecoderLive(config: Config, eventTime: EventTime) extends Decoder {
 
-    val photoDomains: Set[String] = config.configTopLevel.summaryOutput.photoDomains.toSet
-
     // TODO: Why the wrapping with a ZIO?
-    override def decodeLineToExtract(line: String): UIO[Either[String, Extract]] = ZIO.succeed {
-
-      // TODO: Capture full parse failure detail, log failures
-
+    override def decodeLineToExtract(line: String): UIO[Either[String, Extract]] =
+      for {
+        summaryOutput <- config.summaryOutput
+        photoDomains = summaryOutput.photoDomains.toSet
+        toWindowStart <- eventTime.toWindowStart
+      } yield
+        // TODO: Capture full parse failure detail, log failures
       // TODO: If "created_at" doesn't exist, don't attempt to parse
       // TODO: If parsing fails for some reason, log it and filter out - use transducer instead since this is not just parsing
+        for {
+          cursor <- parse(line) match {
+            case Left(parsingFailure) => Left(parsingFailure.message)
+            case Right(json) => Right(json.hcursor)
+          }
+          createdAt <- getStringField(cursor, "created_at")
+          text <- getStringField(cursor, "text")
+          parsedDate <- parseDate(createdAt)
+          urlDomains <- parseUrlDomains(extractUrls(text)) // Fails if parsing any URL fails
+        } yield Extract(
+          windowStart = toWindowStart(parsedDate),
+          hashTags = extractHashTags(text),
+          emojis = extractEmojis(text),
+          urlDomains = urlDomains,
+          containsPhotoUrl = urlDomains.exists(photoDomains.contains)
+        )
 
-      for {
-        cursor <- parse(line) match {
-          case Left(parsingFailure) => Left(parsingFailure.message)
-          case Right(json) => Right(json.hcursor)
-        }
-        createdAt <- getStringField(cursor, "created_at")
-        text <- getStringField(cursor, "text")
-        parsedDate <- parseDate(createdAt)
-        urlDomains <- parseUrlDomains(extractUrls(text)) // Fails if parsing any URL fails
-      } yield Extract(
-        windowStart = eventTime.toWindowStart(parsedDate),
-        hashTags = extractHashTags(text),
-        emojis = extractEmojis(text),
-        urlDomains = urlDomains,
-        containsPhotoUrl = urlDomains.exists(photoDomains.contains)
-      )
-    }
 
     private def getStringField(hCursor: HCursor, name: String): Either[String, String] =
       hCursor.get[String](name) match {
@@ -103,7 +103,7 @@ package object decoder {
   }
 
   object Decoder {
-    def decodeLineToExtract(line: String): ZIO[Has[Decoder], Nothing, Either[String, Extract]] =
+    def decodeLineToExtract(line: String): URIO[Has[Decoder], Either[String, Extract]] =
       ZIO.serviceWith[Decoder](_.decodeLineToExtract(line))
   }
 }

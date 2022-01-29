@@ -2,7 +2,7 @@ package andy42.twitter
 
 import zio.config.typesafe.TypesafeConfigSource
 import zio.duration.Duration
-import zio.{Has, IO, ZIO, ZLayer}
+import zio.{Has, UIO, URIO, ZIO, ZLayer}
 
 package object config {
 
@@ -31,12 +31,17 @@ package object config {
                                        accessTokenSecret: String)
 
   trait Config {
-    val configTopLevel: ConfigTopLevel
-    val configTopLevelM: ZIO[Any, Nothing, ConfigTopLevel]
+    val eventTime: UIO[EventTimeConfig]
+    val streamParameters: UIO[StreamParametersConfig]
+    val summaryOutput: UIO[SummaryOutputConfig]
+    val twitterStream: UIO[TwitterStreamConfig]
   }
 
   case class ConfigLive(configTopLevel: ConfigTopLevel) extends Config {
-    override val configTopLevelM: ZIO[Any, Nothing, ConfigTopLevel] = ZIO.succeed(configTopLevel)
+    override val eventTime: UIO[EventTimeConfig] = ZIO.succeed(configTopLevel.eventTime)
+    override val streamParameters: UIO[StreamParametersConfig] = ZIO.succeed(configTopLevel.streamParameters)
+    override val summaryOutput: UIO[SummaryOutputConfig] = ZIO.succeed(configTopLevel.summaryOutput)
+    override val twitterStream: UIO[TwitterStreamConfig] = ZIO.succeed(configTopLevel.twitterStream)
   }
 
   object ConfigLive {
@@ -60,6 +65,9 @@ package object config {
   }
 
   object Config {
-    val config: ZIO[Has[Config], Nothing, ConfigTopLevel] = ZIO.serviceWith[Config](_.configTopLevelM)
+    val eventTime: URIO[Has[Config], EventTimeConfig] = ZIO.serviceWith[Config](_.eventTime)
+    val streamParameters: URIO[Has[Config], StreamParametersConfig] = ZIO.serviceWith[Config](_.streamParameters)
+    val summaryOutput: URIO[Has[Config], SummaryOutputConfig] = ZIO.serviceWith[Config](_.summaryOutput)
+    val twitterStream: URIO[Has[Config], TwitterStreamConfig] = ZIO.serviceWith[Config](_.twitterStream)
   }
 }
