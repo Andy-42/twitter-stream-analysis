@@ -17,25 +17,24 @@ import scala.util.{Failure, Success, Try}
 
 package object decoder {
 
+  // TODO: Specific failure trait instead of String
   // TODO: Collect all errors (not just first) - maybe use Validated?
+  // TODO: Capture full parse failure detail, log failures
+  // TODO: If "created_at" doesn't exist, don't attempt to parse
+  // TODO: If parsing fails for some reason, log it and filter out - use transducer instead since this is not just parsing
 
   trait Decoder {
-    // TODO: Specific failure trait
-    def decodeLineToExtract(line: String): UIO[Either[String, Extract]]
+    def decodeLineToExtract: UIO[String => Either[String, Extract]]
   }
 
   case class DecoderLive(config: Config, eventTime: EventTime) extends Decoder {
 
-    // TODO: Why the wrapping with a ZIO?
-    override def decodeLineToExtract(line: String): UIO[Either[String, Extract]] =
+    override def decodeLineToExtract: UIO[String => Either[String, Extract]] =
       for {
         summaryOutput <- config.summaryOutput
         photoDomains = summaryOutput.photoDomains.toSet
         toWindowStart <- eventTime.toWindowStart
-      } yield
-        // TODO: Capture full parse failure detail, log failures
-      // TODO: If "created_at" doesn't exist, don't attempt to parse
-      // TODO: If parsing fails for some reason, log it and filter out - use transducer instead since this is not just parsing
+      } yield (line: String) =>
         for {
           cursor <- parse(line) match {
             case Left(parsingFailure) => Left(parsingFailure.message)
@@ -103,7 +102,7 @@ package object decoder {
   }
 
   object Decoder {
-    def decodeLineToExtract(line: String): URIO[Has[Decoder], Either[String, Extract]] =
-      ZIO.serviceWith[Decoder](_.decodeLineToExtract(line))
+    def decodeLineToExtract: URIO[Has[Decoder], String => Either[String, Extract]] =
+      ZIO.serviceWith[Decoder](_.decodeLineToExtract)
   }
 }

@@ -1,15 +1,16 @@
 package andy42.twitter.decoder
 
 import andy42.twitter.decoder.CreateTweet.isCreateTweet
-import andy42.twitter.decoder.Decoder.decodeLineToExtract
 import zio.stream.ZTransducer
 import zio.{Chunk, Has, ZIO}
 
 object DecodeTransducer {
 
-  val decodeStringToExtract: ZTransducer[Has[Decoder], Nothing, String, Extract] =
-    ZTransducer
-      .fromFunctionM(decodeLineToExtract)
+  val decodeStringToExtract: ZIO[Has[Decoder], Nothing, ZTransducer[Any, Nothing, String, Extract]] =
+    for {
+      decodeLineToExtract <- Decoder.decodeLineToExtract
+    } yield ZTransducer
+      .fromFunction(decodeLineToExtract)
       .filterInput(isCreateTweet) >>>
       ZTransducer.fromPush[Any, Nothing, Either[String, Extract], Extract] {
         case None => ZIO.succeed(Chunk.empty)

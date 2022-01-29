@@ -1,11 +1,10 @@
 import andy42.twitter.config.{Config, ConfigLive}
-import andy42.twitter.decoder.DecodeTransducer.decodeStringToExtract
-import andy42.twitter.decoder.{Decoder, DecoderLive}
+import andy42.twitter.decoder.{DecodeTransducer, Decoder, DecoderLive}
 import andy42.twitter.eventTime.{EventTime, EventTimeLive}
 import andy42.twitter.output.{SummaryEmitter, SummaryEmitterLive, WindowSummaryOutput}
 import andy42.twitter.summarize.SummarizeWindowTransducer.summarizeChunks
 import andy42.twitter.summarize.WindowSummarizer.addChunkToSummary
-import andy42.twitter.summarize.{EmptyWindowSummaries, SummarizeWindowTransducer, WindowSummarizer, WindowSummarizerLive}
+import andy42.twitter.summarize.{EmptyWindowSummaries, WindowSummarizer, WindowSummarizerLive}
 import andy42.twitter.tweet.{TweetStream, TweetStreamLive}
 import zio.clock.Clock
 import zio.stream.Transducer.{splitLines, utf8Decode}
@@ -53,33 +52,37 @@ object Test extends zio.App {
       }
   }
 
-  val tweetSummaryProgram: ZIO[Has[Config], Nothing, ZStream[CustomLayer with Clock, Nothing, WindowSummaryOutput]] =
+  val tweetSummaryProgram1: ZIO[Has[Config] with Has[Decoder], Nothing, ZStream[CustomLayer with Clock, Nothing, WindowSummaryOutput]] =
     for {
-      streamParameters <- Config.streamParameters
+      decodeStringToExtract <- DecodeTransducer.decodeStringToExtract
     } yield tweetStream
       // TODO: If these transducers are combined, it confuses the presentation compiler
       .transduce(utf8Decode >>> splitLines)
       .transduce(decodeStringToExtract)
 
-      // This implementation uses `mapAccumM` to statefully summarize the extract stream.
-      // The `groupedWithin` behaviour should be reproduced for the transducer case below.
-      // Note that groupedWithin also changes the stream from O to Chunk[O]
+      .transduce(summarizeChunks)
 
-//      .groupedWithin(
-//        chunkSize = streamParameters.chunkSizeLimit,
-//        within = streamParameters.chunkGroupTimeout)
-//      .mapAccumM(EmptyWindowSummaries)(addChunkToSummary)
-//      .flatten
+      .mapM(SummaryEmitter.emitSummary)
 
-      // The transducer implementation is certainly more concise,
-      // and it doesn't need the extra `flatten` needed with the `mapAccumM` implementation.
-      // The semantics of groupedWithin(chunkSize, within) needs to be implemented.
-            .transduce(summarizeChunks)
+  val tweetSummaryProgram2: ZIO[Has[Config] with Has[Decoder], Nothing, ZStream[CustomLayer with Clock, Nothing, WindowSummaryOutput]] =
+    for {
+      streamParameters <- Config.streamParameters
+      decodeStringToExtract <- DecodeTransducer.decodeStringToExtract
+    } yield tweetStream
+      // TODO: If these transducers are combined, it confuses the presentation compiler
+      .transduce(utf8Decode >>> splitLines)
+      .transduce(decodeStringToExtract)
+
+      .groupedWithin(
+        chunkSize = streamParameters.chunkSizeLimit,
+        within = streamParameters.chunkGroupTimeout)
+      .mapAccumM(EmptyWindowSummaries)(addChunkToSummary)
+      .flatten
 
       .mapM(SummaryEmitter.emitSummary)
 
   override def run(args: List[String]): URIO[ZEnv, ExitCode] =
-    tweetSummaryProgram.provideCustomLayer(configLayer).flatMap {
+    tweetSummaryProgram1.provideCustomLayer(configLayer ++ decodeLayer).flatMap {
       _.provideCustomLayer(customLayer)
         .tap(ZIO.debug(_))
         .runDrain
