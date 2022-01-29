@@ -1,12 +1,12 @@
 package andy42.twitter.decoder
 
 import andy42.twitter.decoder.CreateTweet.isCreateTweet
-import zio.stream.ZTransducer
-import zio.{Chunk, Has, ZIO}
+import zio.stream.{Transducer, ZTransducer}
+import zio.{Chunk, Has, URIO, ZIO}
 
 object DecodeTransducer {
 
-  val decodeStringToExtract: ZIO[Has[Decoder], Nothing, ZTransducer[Any, Nothing, String, Extract]] =
+  val decodeStringToExtract: URIO[Has[Decoder], Transducer[Nothing, String, Extract]] =
     for {
       decodeLineToExtract <- Decoder.decodeLineToExtract
     } yield ZTransducer

@@ -17,11 +17,8 @@ import scala.util.{Failure, Success, Try}
 
 package object decoder {
 
-  // TODO: Specific failure trait instead of String
   // TODO: Collect all errors (not just first) - maybe use Validated?
-  // TODO: Capture full parse failure detail, log failures
-  // TODO: If "created_at" doesn't exist, don't attempt to parse
-  // TODO: If parsing fails for some reason, log it and filter out - use transducer instead since this is not just parsing
+  // TODO: Capture full parse failure detail in a sealed trait (instead of a String) that can be logged (i.e., in JSON)
 
   trait Decoder {
     def decodeLineToExtract: UIO[String => Either[String, Extract]]

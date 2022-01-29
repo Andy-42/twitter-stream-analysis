@@ -9,27 +9,27 @@ import andy42.twitter.tweet.{TweetStream, TweetStreamLive}
 import zio.clock.Clock
 import zio.stream.Transducer.{splitLines, utf8Decode}
 import zio.stream.ZStream
-import zio.{ExitCode, Has, URIO, ZEnv, ZIO, ZLayer}
+import zio.{ExitCode, Has, ULayer, URIO, ZEnv, ZIO, ZLayer}
 
 object Test extends zio.App {
 
   // Reading the config could produce a ReadError[Sting], but fail right here if that happens.
-  val configLayer: ZLayer[Any, Nothing, Has[Config]] =
+  val configLayer: ULayer[Has[Config]] =
     ConfigLive.layer.orDie
 
-  val tweetStreamLayer: ZLayer[Any, Nothing, Has[TweetStream]] =
+  val tweetStreamLayer: ULayer[Has[TweetStream]] =
     configLayer >>> TweetStreamLive.layer
 
-  val eventTimeLayer: ZLayer[Any, Nothing, Has[EventTime]] =
+  val eventTimeLayer: ULayer[Has[EventTime]] =
     configLayer >>> EventTimeLive.layer
 
-  val decodeLayer: ZLayer[Any, Nothing, Has[Decoder]] =
+  val decodeLayer: ULayer[Has[Decoder]] =
     (configLayer ++ eventTimeLayer) >>> DecoderLive.layer
 
-  val summaryEmitterLayer: ZLayer[Any, Nothing, Has[SummaryEmitter]] =
+  val summaryEmitterLayer: ULayer[Has[SummaryEmitter]] =
     (configLayer ++ eventTimeLayer) >>> SummaryEmitterLive.layer
 
-  val windowSummarizer: ZLayer[Any, Nothing, Has[WindowSummarizer]] =
+  val windowSummarizer: ULayer[Has[WindowSummarizer]] =
     (Clock.live ++ eventTimeLayer ++ summaryEmitterLayer) >>> WindowSummarizerLive.layer
 
   type CustomLayer = Has[TweetStream] with Has[Decoder] with Has[WindowSummarizer] with Has[SummaryEmitter] with Has[EventTime]
@@ -52,7 +52,7 @@ object Test extends zio.App {
       }
   }
 
-  val tweetSummaryProgram1: ZIO[Has[Config] with Has[Decoder], Nothing, ZStream[CustomLayer with Clock, Nothing, WindowSummaryOutput]] =
+  val tweetSummaryProgram1: URIO[Has[Config] with Has[Decoder], ZStream[CustomLayer with Clock, Nothing, WindowSummaryOutput]] =
     for {
       decodeStringToExtract <- DecodeTransducer.decodeStringToExtract
     } yield tweetStream
@@ -64,7 +64,7 @@ object Test extends zio.App {
 
       .mapM(SummaryEmitter.emitSummary)
 
-  val tweetSummaryProgram2: ZIO[Has[Config] with Has[Decoder], Nothing, ZStream[CustomLayer with Clock, Nothing, WindowSummaryOutput]] =
+  val tweetSummaryProgram2: URIO[Has[Config] with Has[Decoder], ZStream[CustomLayer with Clock, Nothing, WindowSummaryOutput]] =
     for {
       streamParameters <- Config.streamParameters
       decodeStringToExtract <- DecodeTransducer.decodeStringToExtract

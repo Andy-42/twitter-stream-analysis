@@ -50,7 +50,7 @@ package object output {
   }
 
   object SummaryEmitter {
-    def emitSummary(windowSummary: WindowSummary): ZIO[Has[SummaryEmitter], Nothing, WindowSummaryOutput] =
+    def emitSummary(windowSummary: WindowSummary): URIO[Has[SummaryEmitter], WindowSummaryOutput] =
       ZIO.serviceWith[SummaryEmitter](_.emitSummary(windowSummary))
   }
 }

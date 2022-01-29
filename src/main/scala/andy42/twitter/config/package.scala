@@ -2,7 +2,7 @@ package andy42.twitter
 
 import zio.config.typesafe.TypesafeConfigSource
 import zio.duration.Duration
-import zio.{Has, UIO, URIO, ZIO, ZLayer}
+import zio.{Has, Layer, UIO, URIO, ZIO, ZLayer}
 
 package object config {
 
@@ -57,7 +57,7 @@ package object config {
     val configDescriptor: ConfigDescriptor[ConfigTopLevel] =
       descriptor[ConfigTopLevel].mapKey(toKebabCase)
 
-    val layer: ZLayer[Any, ReadError[String], Has[Config]] =
+    val layer: Layer[ReadError[String], Has[Config]] =
       ZLayer.fromEffect {
         for {
           configTopLevel <- read(configDescriptor from TypesafeConfigSource.fromResourcePath)
