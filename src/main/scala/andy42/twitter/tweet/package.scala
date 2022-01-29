@@ -36,7 +36,7 @@ package object tweet {
     // Provide cats implementations to http4s/fs2
     implicit val runtime: zio.Runtime[ZEnv] = zio.Runtime.default
 
-    override def tweetStream: UIO[Stream[Throwable, Byte]] = {
+    override def tweetStream: UIO[Stream[Throwable, Byte]] =
       for {
         twitterStream <- config.twitterStream
         request = Request[Task](Method.GET, twitterStream.sampleApiUrl)
@@ -51,15 +51,15 @@ package object tweet {
 
         fs2Stream.toZStream(queueSize = twitterStream.bufferSize)
       }
-    }
 
     /** Sign the request. This is effectful since signing generates a random nonce. */
-    def sign(request: Request[Task])(twitterStreamConfig: TwitterStreamConfig): Task[Request[Task]] = {
-      val consumer = oauth1.Consumer(twitterStreamConfig.apiKey, twitterStreamConfig.apiKeySecret)
-      val token = oauth1.Token(twitterStreamConfig.accessToken, twitterStreamConfig.accessTokenSecret)
+    def sign(request: Request[Task])(twitterStreamConfig: TwitterStreamConfig): Task[Request[Task]] =
       oauth1.signRequest(
-        req = request, consumer = consumer, callback = None, verifier = None, token = Some(token))
-    }
+        req = request,
+        consumer = oauth1.Consumer(twitterStreamConfig.apiKey, twitterStreamConfig.apiKeySecret),
+        callback = None,
+        verifier = None,
+        token = Some(oauth1.Token(twitterStreamConfig.accessToken, twitterStreamConfig.accessTokenSecret)))
   }
 
   object TweetStreamLive {

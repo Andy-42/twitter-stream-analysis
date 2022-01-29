@@ -12,7 +12,7 @@ object DecodeTransducer {
     } yield ZTransducer
       .fromFunction(decodeLineToExtract)
       .filterInput(isCreateTweet) >>>
-      ZTransducer.fromPush[Any, Nothing, Either[String, Extract], Extract] {
+      ZTransducer.fromPush {
         case None => ZIO.succeed(Chunk.empty)
         case Some(chunk) => ZIO.succeed {
           val (decodeFailure, decodeSuccess) = chunk.partitionMap(identity)
