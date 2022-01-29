@@ -28,7 +28,8 @@ package object config {
                                        apiKey: String,
                                        apiKeySecret: String,
                                        accessToken: String,
-                                       accessTokenSecret: String)
+                                       accessTokenSecret: String,
+                                       bufferSize: Int)
 
   trait Config {
     val eventTime: UIO[EventTimeConfig]

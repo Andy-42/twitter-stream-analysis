@@ -4,7 +4,7 @@ import andy42.twitter.config.{Config, TwitterStreamConfig}
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.client.oauth1
 import org.http4s.{Method, Request}
-import zio.{Task, _}
+import zio._
 import zio.interop.catz._
 import zio.stream.Stream
 import zio.stream.interop.fs2z._
@@ -49,7 +49,7 @@ package object tweet {
           tweetChunk <- response.body
         } yield tweetChunk
 
-        fs2Stream.toZStream(queueSize = 8196) // TODO: Config
+        fs2Stream.toZStream(queueSize = twitterStream.bufferSize)
       }
     }
 

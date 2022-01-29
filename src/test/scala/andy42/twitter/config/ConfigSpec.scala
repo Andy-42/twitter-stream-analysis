@@ -21,6 +21,8 @@ object ConfigSpec extends DefaultRunnableSpec {
         |  api-key-secret = API_KEY_SECRET
         |  access-token = ACCESS_TOKEN
         |  access-token-secret = ACCESS_TOKEN_SECRET
+        |
+        |  buffer-size = 8196
         |}
         |
         |event-time {
@@ -57,7 +59,8 @@ object ConfigSpec extends DefaultRunnableSpec {
         apiKey = "API_KEY",
         apiKeySecret = "API_KEY_SECRET",
         accessToken = "ACCESS_TOKEN",
-        accessTokenSecret = "ACCESS_TOKEN_SECRET")
+        accessTokenSecret = "ACCESS_TOKEN_SECRET",
+        bufferSize = 8192)
     )
 
     val result: IO[ReadError[String], ConfigTopLevel] =
