@@ -69,6 +69,22 @@ object WindowSummary {
       emojiCounts = Map.empty
     )
 
+  /** Update the window summaries for each distinct window start time.
+   * The `tweetExtracts` must not include expired tweets since that will cause expired windows to be resurrected. */
+  def updateSummaries(windowSummaries: WindowSummaries,
+                      tweetExtracts: Chunk[Extract],
+                      now: EpochMillis): WindowSummaries = {
+    val updatedOrNewSummaries = for {
+      windowStart <- tweetExtracts.iterator.map(_.windowStart).distinct
+
+      previousSummaryForWindow = windowSummaries.getOrElse(
+        key = windowStart, default = WindowSummary(windowStart = windowStart, now = now))
+
+    } yield windowStart -> previousSummaryForWindow.add(tweetExtracts, now)
+
+    windowSummaries ++ updatedOrNewSummaries
+  }
+
   /** Calculate the count for each occurrence of a String.
    *
    * This method is approximately equivalent to calling:

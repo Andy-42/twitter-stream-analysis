@@ -36,7 +36,6 @@ object Test extends zio.App {
   val customLayer = tweetStreamLayer ++ decodeLayer ++ windowSummarizer ++ summaryEmitterLayer ++ eventTimeLayer
 
 
-  // Get the stream. Since the stream is produced in an effect, it has to be unwrapped.
   val tweetStream: ZStream[Has[TweetStream], Nothing, Byte] =
     ZStream.unwrap {
       for {
@@ -86,6 +85,7 @@ object Test extends zio.App {
       .groupedWithin(
         chunkSize = streamParameters.chunkSizeLimit,
         within = streamParameters.chunkGroupTimeout)
+
       .mapAccumM(EmptyWindowSummaries)(addChunkToSummary)
       .flatten
 
