@@ -9,7 +9,7 @@ import andy42.twitter.tweet.{TweetStream, TweetStreamLive}
 import zio.clock.Clock
 import zio.stream.Transducer.{splitLines, utf8Decode}
 import zio.stream.ZStream
-import zio.{ExitCode, Has, ULayer, URIO, ZEnv, ZIO, ZLayer}
+import zio.{ExitCode, Has, ULayer, URIO, ZEnv, ZIO}
 
 object Test extends zio.App {
 
@@ -37,28 +37,39 @@ object Test extends zio.App {
 
 
   // Get the stream. Since the stream is produced in an effect, it has to be unwrapped.
-  val tweetStream: ZStream[Has[TweetStream], Nothing, Byte] = ZStream.unwrap {
-    for {
-      stream <- TweetStream.tweetStream
-    } yield stream
-      // The http4s stream can fail with a Throwable.
-      // In a real application, we would have a more meaningful way to recover the stream
-      // (e.g., reopen it). This should also be aligned with managing the HTTP client.
-      // For now, just print the error and stop.
-      .catchAll {
-        e =>
-          println(e) // TODO: Log error
-          ZStream()
-      }
-  }
+  val tweetStream: ZStream[Has[TweetStream], Nothing, Byte] =
+    ZStream.unwrap {
+      for {
+        stream <- TweetStream.tweetStream
+      } yield handleFailure(stream)
+    }
 
-  val tweetSummaryProgram1: URIO[Has[Config] with Has[Decoder], ZStream[CustomLayer with Clock, Nothing, WindowSummaryOutput]] =
+  /** Handle failures in the tweet stream.
+   *
+   * The http4s stream can fail with a Throwable.
+   * In a real application, we would have a more meaningful way to recover the stream
+   * (e.g., reopen it). This should also be aligned with managing the HTTP client.
+   * For now, just print the error and terminate the stream.
+   */
+  def handleFailure(tweetStream: ZStream[Any, Throwable, Byte]): ZStream[Any, Nothing, Byte] =
+    tweetStream.catchAll {
+      e =>
+        println(e) // TODO: Log error
+        ZStream()
+    }
+
+  val tweetSummaryProgram1: ZIO[Has[Config] with Has[Decoder], Nothing, ZStream[CustomLayer with Clock, Nothing, WindowSummaryOutput]] =
     for {
+      streamParameters <- Config.streamParameters
       decodeStringToExtract <- DecodeTransducer.decodeStringToExtract
     } yield tweetStream
-      // TODO: If these transducers are combined, it confuses the presentation compiler
       .transduce(utf8Decode >>> splitLines)
       .transduce(decodeStringToExtract)
+
+      .groupedWithin(
+        chunkSize = streamParameters.chunkSizeLimit,
+        within = streamParameters.chunkGroupTimeout)
+      .flattenChunks
 
       .transduce(summarizeChunks)
 
@@ -69,7 +80,6 @@ object Test extends zio.App {
       streamParameters <- Config.streamParameters
       decodeStringToExtract <- DecodeTransducer.decodeStringToExtract
     } yield tweetStream
-      // TODO: If these transducers are combined, it confuses the presentation compiler
       .transduce(utf8Decode >>> splitLines)
       .transduce(decodeStringToExtract)
 
