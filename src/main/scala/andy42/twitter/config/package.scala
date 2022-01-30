@@ -2,7 +2,7 @@ package andy42.twitter
 
 import zio.config.typesafe.TypesafeConfigSource
 import zio.duration.Duration
-import zio.{Has, Layer, UIO, URIO, ZIO, ZLayer}
+import zio.{Has, UIO, URIO, ZIO, ZLayer}
 
 package object config {
 

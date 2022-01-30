@@ -1,6 +1,6 @@
 package andy42.twitter
 
-import andy42.twitter.config.{Config, TwitterStreamConfig}
+import andy42.twitter.config.Config
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.client.oauth1
 import org.http4s.{Method, Request}
