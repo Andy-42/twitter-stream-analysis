@@ -25,13 +25,8 @@ object SummarizeWindowTransducer {
                 case (windowStart, _) => isExpired(windowStart)
               }
 
-              maybeChunk match {
-
-                case None =>
-                  Chunk.fromIterable(expired.values) -> ongoing
-
-                case Some(chunk) =>
-                  Chunk.fromIterable(expired.values) -> updateSummaries(
+              Chunk.fromIterable(expired.values) -> maybeChunk.fold(ongoing){ chunk =>
+                   updateSummaries(
                     windowSummaries = ongoing,
                     tweetExtracts = chunk.filter(extract => !isExpired(extract.windowStart)),
                     now = now)
