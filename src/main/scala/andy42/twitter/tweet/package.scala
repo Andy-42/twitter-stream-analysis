@@ -42,12 +42,12 @@ package object tweet {
         request = Request[Task](Method.GET, twitterStream.sampleApiUrl)
         signRequest = sign(request)(twitterStream)
       } yield {
-        val fs2Stream: fs2.Stream[Task, Byte] = for {
+        val fs2Stream = for {
           client <- BlazeClientBuilder[Task](runtime.platform.executor.asEC).stream
           signedRequest <- fs2.Stream.eval(signRequest)
           response <- client.stream(signedRequest)
-          tweetChunk <- response.body
-        } yield tweetChunk
+          tweetByteChunk <- response.body
+        } yield tweetByteChunk
 
         fs2Stream.toZStream(queueSize = twitterStream.bufferSize)
       }
