@@ -22,10 +22,7 @@ package object config {
                                           chunkGroupTimeout: Duration)
 
   final case class SummaryOutputConfig(topN: Int,
-                                       photoDomains: List[String]
-                                      ) {
-    def isPhotoDomain(domain: String): Boolean = photoDomains.contains(domain)
-  }
+                                       photoDomains: List[String])
 
   final case class TwitterStreamConfig(sampleApiUrl: org.http4s.Uri,
                                        apiKey: String,
