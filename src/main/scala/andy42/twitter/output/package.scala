@@ -15,10 +15,11 @@ package object output {
 
   case class SummaryEmitterLive(config: Config, eventTime: EventTime) extends SummaryEmitter {
 
-    override def emitSummary(windowSummary: WindowSummary): UIO[WindowSummaryOutput] =
+    override def emitSummary(windowSummary: WindowSummary): UIO[WindowSummaryOutput] = {
+
+      val topN = config.summaryOutput.topN
+
       for {
-        summaryOutput <- config.summaryOutput
-        topN = summaryOutput.topN
         toWindowEnd <- eventTime.toWindowEnd
       } yield WindowSummaryOutput(
         windowStart = Instant.ofEpochMilli(windowSummary.windowStart).toString,
@@ -35,6 +36,7 @@ package object output {
         tweetsWithUrlPercent = 100.0 * windowSummary.tweetsWithUrl / windowSummary.tweets,
         tweetsWithPhotoUrlPercent = 100.0 * windowSummary.tweetsWithPhotoUrl / windowSummary.tweets
       )
+    }
 
     /** Get the top N values by counts in descending order. */
     def top(topN: Int, counts: Map[String, Count]): Seq[String] =

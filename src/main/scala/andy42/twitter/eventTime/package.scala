@@ -19,18 +19,17 @@ package object eventTime {
   }
 
   case class EventTimeLive(config: Config) extends EventTime {
+    val windowSize = config.eventTime.windowSize.toMillis
+    val watermark = config.eventTime.watermark.toMillis
 
     /** Move an instant (in millis) to the start of a window */
     override def toWindowStart: UIO[EpochMillis => WindowStart] =
-      for {
-        eventTime <- config.eventTime
-        windowSize = eventTime.windowSize.toMillis
-      } yield (instant: EpochMillis) => instant - (instant % windowSize)
+      ZIO.succeed {
+        (instant: EpochMillis) => instant - (instant % windowSize)
+      }
 
     override def toWindowEnd: UIO[EpochMillis => WindowEnd] =
       for {
-        eventTime <- config.eventTime
-        windowSize = eventTime.windowSize.toMillis
         toWindowStart <- toWindowStart
       } yield (instant: EpochMillis) => toWindowStart(instant) + windowSize - 1
 
@@ -40,8 +39,6 @@ package object eventTime {
      */
     override def isExpired(now: EpochMillis): UIO[EpochMillis => Boolean] =
       for {
-        eventTime <- config.eventTime
-        watermark = eventTime.watermark.toMillis
         toWindowEnd <- toWindowEnd
       } yield (instant: EpochMillis) => toWindowEnd(instant) < (now - watermark)
   }

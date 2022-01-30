@@ -33,27 +33,28 @@ package object tweet {
 
   case class TweetStreamLive(config: Config) extends TweetStream {
 
+    val twitterStreamConfig = config.twitterStream
+
     // Provide cats implementations to http4s/fs2
     implicit val runtime: zio.Runtime[ZEnv] = zio.Runtime.default
 
-    override def tweetStream: UIO[Stream[Throwable, Byte]] =
-      for {
-        twitterStream <- config.twitterStream
-        request = Request[Task](Method.GET, twitterStream.sampleApiUrl)
-        signRequest = sign(request)(twitterStream)
-      } yield {
-        val fs2Stream = for {
-          client <- BlazeClientBuilder[Task](runtime.platform.executor.asEC).stream
-          signedRequest <- fs2.Stream.eval(signRequest)
-          response <- client.stream(signedRequest)
-          tweetByteChunk <- response.body
-        } yield tweetByteChunk
+    override def tweetStream: UIO[Stream[Throwable, Byte]] = ZIO.succeed {
 
-        fs2Stream.toZStream(queueSize = twitterStream.bufferSize)
-      }
+      val request = Request[Task](Method.GET, twitterStreamConfig.sampleApiUrl)
+      val signRequest = sign(request)
+
+      val fs2Stream = for {
+        client <- BlazeClientBuilder[Task](runtime.platform.executor.asEC).stream
+        signedRequest <- fs2.Stream.eval(signRequest)
+        response <- client.stream(signedRequest)
+        tweetByteChunk <- response.body
+      } yield tweetByteChunk
+
+      fs2Stream.toZStream(queueSize = twitterStreamConfig.bufferSize)
+    }
 
     /** Sign the request. This is effectful since signing generates a random nonce. */
-    def sign(request: Request[Task])(twitterStreamConfig: TwitterStreamConfig): Task[Request[Task]] =
+    def sign(request: Request[Task]): Task[Request[Task]] =
       oauth1.signRequest(
         req = request,
         consumer = oauth1.Consumer(twitterStreamConfig.apiKey, twitterStreamConfig.apiKeySecret),

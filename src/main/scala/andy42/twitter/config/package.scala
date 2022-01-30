@@ -6,10 +6,13 @@ import zio.{Has, Layer, UIO, URIO, ZIO, ZLayer}
 
 package object config {
 
-  final case class ConfigTopLevel(eventTime: EventTimeConfig,
-                                  streamParameters: StreamParametersConfig,
-                                  summaryOutput: SummaryOutputConfig,
-                                  twitterStream: TwitterStreamConfig)
+  final case class Config(eventTime: EventTimeConfig,
+                          streamParameters: StreamParametersConfig,
+                          summaryOutput: SummaryOutputConfig,
+                          twitterStream: TwitterStreamConfig) {
+
+    def streamParametersM: UIO[StreamParametersConfig] = ZIO.succeed(streamParameters)
+  }
 
   final case class EventTimeConfig(windowSize: Duration,
                                    watermark: Duration)
@@ -31,20 +34,6 @@ package object config {
                                        accessTokenSecret: String,
                                        bufferSize: Int)
 
-  trait Config {
-    val eventTime: UIO[EventTimeConfig]
-    val streamParameters: UIO[StreamParametersConfig]
-    val summaryOutput: UIO[SummaryOutputConfig]
-    val twitterStream: UIO[TwitterStreamConfig]
-  }
-
-  case class ConfigLive(configTopLevel: ConfigTopLevel) extends Config {
-    override val eventTime: UIO[EventTimeConfig] = ZIO.succeed(configTopLevel.eventTime)
-    override val streamParameters: UIO[StreamParametersConfig] = ZIO.succeed(configTopLevel.streamParameters)
-    override val summaryOutput: UIO[SummaryOutputConfig] = ZIO.succeed(configTopLevel.summaryOutput)
-    override val twitterStream: UIO[TwitterStreamConfig] = ZIO.succeed(configTopLevel.twitterStream)
-  }
-
   object ConfigLive {
 
     import zio.config._
@@ -54,21 +43,20 @@ package object config {
       Descriptor[String].transformOrFailLeft(
         s => org.http4s.Uri.fromString(s).swap.map(_.getMessage).swap)(url => url.toString)
 
-    val configDescriptor: ConfigDescriptor[ConfigTopLevel] =
-      descriptor[ConfigTopLevel].mapKey(toKebabCase)
+    val configDescriptor: ConfigDescriptor[Config] =
+      descriptor[Config].mapKey(toKebabCase)
 
-    val layer: Layer[ReadError[String], Has[Config]] =
-      ZLayer.fromEffect {
-        for {
-          configTopLevel <- read(configDescriptor from TypesafeConfigSource.fromResourcePath)
-        } yield ConfigLive(configTopLevel)
-      }
+    val layer: ZLayer[Any, ReadError[String], Has[Config]] =
+      read(configDescriptor from TypesafeConfigSource.fromResourcePath).toLayer
   }
 
   object Config {
-    val eventTime: URIO[Has[Config], EventTimeConfig] = ZIO.serviceWith[Config](_.eventTime)
-    val streamParameters: URIO[Has[Config], StreamParametersConfig] = ZIO.serviceWith[Config](_.streamParameters)
-    val summaryOutput: URIO[Has[Config], SummaryOutputConfig] = ZIO.serviceWith[Config](_.summaryOutput)
-    val twitterStream: URIO[Has[Config], TwitterStreamConfig] = ZIO.serviceWith[Config](_.twitterStream)
+    /**
+     * Access the stream configuration.
+     * This is only needed if the configuration has to be accessed from outside a Layer.
+     * The member being accessed has to be an effect in order to create an accessor.
+     */
+    def streamParameters: URIO[Has[Config], StreamParametersConfig] =
+      ZIO.serviceWith[Config](_.streamParametersM)
   }
 }

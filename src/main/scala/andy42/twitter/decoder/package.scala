@@ -26,10 +26,10 @@ package object decoder {
 
   case class DecoderLive(config: Config, eventTime: EventTime) extends Decoder {
 
+    val photoDomains = config.summaryOutput.photoDomains.toSet
+
     override def decodeLineToExtract: UIO[String => Either[String, Extract]] =
       for {
-        summaryOutput <- config.summaryOutput
-        photoDomains = summaryOutput.photoDomains.toSet
         toWindowStart <- eventTime.toWindowStart
       } yield (line: String) =>
         for {

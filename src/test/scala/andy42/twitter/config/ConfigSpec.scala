@@ -42,7 +42,7 @@ object ConfigSpec extends DefaultRunnableSpec {
         |}
         |""".stripMargin
 
-    val expected = ConfigTopLevel(
+    val expected = Config(
       eventTime = EventTimeConfig(
         windowSize = 5.seconds,
         watermark = 15.seconds),
@@ -63,7 +63,7 @@ object ConfigSpec extends DefaultRunnableSpec {
         bufferSize = 8192)
     )
 
-    val result: IO[ReadError[String], ConfigTopLevel] =
+    val result: IO[ReadError[String], Config] =
       read(ConfigLive.configDescriptor from ConfigSource.fromHoconString(validHoconString))
 
     testM("A valid configuration can be read") {
