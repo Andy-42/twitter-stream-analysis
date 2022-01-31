@@ -11,7 +11,7 @@ import zio.stream.Transducer.{splitLines, utf8Decode}
 import zio.stream.ZStream
 import zio.{ExitCode, Has, ULayer, URIO, ZEnv, ZIO}
 
-object Test extends zio.App {
+object Main extends zio.App {
 
   // Reading the config could produce a ReadError[Sting], but fail right here if that happens.
   val configLayer: ULayer[Has[Config]] =
