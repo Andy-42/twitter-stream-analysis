@@ -36,23 +36,33 @@ to capture notes about each component here.
 
 ## ZIO 1.x or 2.x?
 
-I initially thought that I would implement this using ZIO 2.x since there
-are many exciting improvements in ZIO 2.x. In particular, I really like
-how ZLayer in ZIO 2.x is simplified. This is a big one for me, and one
-that I would like to get to sooner rather than later. Using ZLayer
-as an organizing principle was one of the ideas that made me interested
-in ZIO - I am not aware of any similar idea in the Typelevel stack.
-
-I quickly got frustrated with the lack of documentation for ZIO 2.x.
-It was just too hard to get up to speed on ZIO without proper documentation.
-Perhaps I can contribute something to that effort - but only after I get myself
-going in ZIO, and I really need some sort of documentation for that.
-
-I'm also not convinced that all the parts that I need for this project
-are available in ZIO 2.x yet. I will leave the conversion to ZIO 2.x
-to some later stage.
+I had originally thought that I would start this as a ZIO 2.0 project, but
+had some issues that were difficult to solve given the state of ZIO 2.0 documentation
+at the time. I did the initial implementation in ZIO 1.0, and I will convert
+it to 2.0 shortly.
 
 ## Config
+
+Using zio-config was a really nice surprise. Implementing a configuration layer
+was simple - certainly less boilerplate than the original implementation.
+Other than describing the configuration in case classes, there is little else
+needed. I had to implement a Descriptor to specify how strings were converted to URLs,
+and to specify that the HOCON configuration uses kebab casing. 
+
+Other than that zio-config does its magic and creates the configuration layer automatically.
+The complete lack of boilerplate is amazing. There is one issue that I had a problem with is
+that I wanted to be able to access the configuration from business logic (i.e., the main program)
+as opposed to from another layer.
+
+The generated configuration trait is just the case class that represents the entire configuration.
+The members of this configuration are all pure code (i.e., not effects). Since they are not effects,
+they can't be accessed using an accessor (i.e., ZIO.serviceWith), so they can't be accessed from
+outside of a service. I was able to work around this by adding a member to the top-level configuration
+that wraps the result in a ZIO (`Config.streamParametersM'). This lets me create an accessor and use
+the configuration from outside of a layer.
+
+A layer that depends on Config can access the pure code directly (i.e., without flatmap-ing over the
+configuration members). 
 
 ## JSON
 
