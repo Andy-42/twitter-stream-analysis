@@ -56,11 +56,9 @@ sampleQueries:
       RETURN n
   - name: tweets in reply to another tweet
     query: >
-      MATCH (n)
-      WHERE n-[:isReplyToTweet]->other
+      MATCH (n)-[:isReplyToTweet]->(other)
       RETURN n
   - name: tweets that have since been deleted
     query: >
-      MATCH (n)
-      WHERE n-[:deletedAt]->deletedAtTime
+      MATCH (n)-[:deletedAt]->(deletedAtTime)
       RETURN n
