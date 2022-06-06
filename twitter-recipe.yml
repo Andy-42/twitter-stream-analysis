@@ -1,0 +1,63 @@
+version: 1
+title: Ingest Twitter v1.1 sample statuses stream
+contributor: https://github.com/Andy-42
+summary: Consume Twitter v1.1 sample statuses stream events to build a timeseries reified graph
+description: |-
+  Consume a stream from the Twitter statuses sample stream https://stream.twitter.com/1.1/statuses/sample.json.
+  The stream of JSON lines is produced by a separate executable that writes to stdout and piped into Quine.
+  Tweet and user nodes are extracted to the graph.
+ingestStreams:
+  - type: StandardInputIngest
+    format:
+      type: CypherJson
+      query: |-
+        MATCH (createTweetNode) WHERE id(createTweetNode) = idFrom("tweet", $that.id)
+        MATCH (createdByUserNode) WHERE id(createdByUserNode) = idFrom("user", $that.user.id)
+        MATCH (inReplyToTweetNode) WHERE id(inReplyToTweetNode) = idFrom("tweet", $that.in_reply_to_status_id)
+        MATCH (inReplyToUserNode) WHERE id(inReplyToUserNode) = idFrom("user", $that.in_reply_to_user_id)
+        MATCH (deleteTweetNode) WHERE id(deleteTweetNode) = idFrom("tweet", $that.delete.status.id)
+        MATCH (deletedByUserNode) WHERE id(deletedByUserNode) = idFrom("user", $that.delete.status.user_id)
+        SET createTweetNode.type = "tweet", createTweetNode.tweet_id = $that.id, createTweetNode.text = $that.text
+        SET createdByUserNode.type = "user", createdByUserNode.user_id = $that.user.id, createdByUserNode.name = $that.user.name
+        SET inReplyToTweetNode.type = "tweet", inReplyToTweetNode.tweet_id = $that.in_reply_to_status_id
+        SET inReplyToUserNode.type ="user", inReplyToUserNode.user_id = $that.in_reply_to_user_id
+        SET deleteTweetNode.type = "tweet", deleteTweetNode.tweet_id = $that.delete.status.id
+        SET deletedByUserNode.type = "user", deletedByUserNode.user_id = $that.delete.status.user_id
+        WITH *, timestamp(toInteger($that.timestamp_ms)) AS d
+        CALL reify.time(d) YIELD node AS timeNode
+        CALL incrementCounter(timeNode, "count")
+        CREATE (createTweetNode)-[:createdAt]->(timeNode)
+        CREATE (createTweetNode)-[:createdBy]->(createdByUserNode)
+        CREATE (createTweetNode)-[:inReplyToTweet]->(inReplyToTweetNode)
+        CREATE (createTweetNode)-[:inReplyToUser]->(inReplyToUserNode)
+        CREATE (deleteTweetNode)-[:deletedAt]->(timeNode)
+        CREATE (deleteTweetNode)-[:deletedBy]->(deletedByUserNode)
+standingQueries: []
+nodeAppearances: []
+quickQueries: []
+sampleQueries:
+  - name: time nodes
+    query: >
+      MATCH (n)
+      WHERE EXISTS(n.period)
+      RETURN n
+  - name: tweet nodes
+    query: >
+      MATCH (n)
+      WHERE n.type = "tweet"
+      RETURN n
+  - name: user nodes
+    query: >
+      MATCH (n)
+      WHERE n.type = "user"
+      RETURN n
+  - name: tweets in reply to another tweet
+    query: >
+      MATCH (n)
+      WHERE n-[:isReplyToTweet]->other
+      RETURN n
+  - name: tweets that have since been deleted
+    query: >
+      MATCH (n)
+      WHERE n-[:deletedAt]->deletedAtTime
+      RETURN n

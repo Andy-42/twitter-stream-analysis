@@ -33,4 +33,7 @@ libraryDependencies ++= Seq(
   "dev.zio" %% "zio-test-sbt" % zioVersion % Test
 )
 
+ThisBuild / assembly / assemblyJarName := "twitter-stream-source.jar"
+ThisBuild / assembly / mainClass := Some("TwitterStream")
+
 //Compile / run / mainClass := Some("andy42.twitter.config.Test")
