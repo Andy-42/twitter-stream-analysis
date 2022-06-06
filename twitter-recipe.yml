@@ -17,15 +17,18 @@ ingestStreams:
         MATCH (inReplyToUserNode) WHERE id(inReplyToUserNode) = idFrom("user", $that.in_reply_to_user_id)
         MATCH (deleteTweetNode) WHERE id(deleteTweetNode) = idFrom("tweet", $that.delete.status.id)
         MATCH (deletedByUserNode) WHERE id(deletedByUserNode) = idFrom("user", $that.delete.status.user_id)
+
         SET createTweetNode.type = "tweet", createTweetNode.tweet_id = $that.id, createTweetNode.text = $that.text
         SET createdByUserNode.type = "user", createdByUserNode.user_id = $that.user.id, createdByUserNode.name = $that.user.name
         SET inReplyToTweetNode.type = "tweet", inReplyToTweetNode.tweet_id = $that.in_reply_to_status_id
         SET inReplyToUserNode.type ="user", inReplyToUserNode.user_id = $that.in_reply_to_user_id
         SET deleteTweetNode.type = "tweet", deleteTweetNode.tweet_id = $that.delete.status.id
         SET deletedByUserNode.type = "user", deletedByUserNode.user_id = $that.delete.status.user_id
-        WITH *, timestamp(toInteger($that.timestamp_ms)) AS d
+
+        WITH *, datetime({epochMillis: toInteger($that.timestamp_ms) }) AS d
         CALL reify.time(d) YIELD node AS timeNode
         CALL incrementCounter(timeNode, "count")
+
         CREATE (createTweetNode)-[:createdAt]->(timeNode)
         CREATE (createTweetNode)-[:createdBy]->(createdByUserNode)
         CREATE (createTweetNode)-[:inReplyToTweet]->(inReplyToTweetNode)
