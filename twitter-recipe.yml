@@ -27,7 +27,7 @@ ingestStreams:
         SET deletedByUserNode.type = "user", deletedByUserNode.user_id = $that.delete.status.user_id
 
         WITH *, datetime({ epochMillis: toInteger($that.timestamp_ms), timezone: 'UTC' }) AS d
-        CALL reify.time(d, "year", "month", "day", "hour", "minute", "second") YIELD node AS timeNode
+        CALL reify.time(d, ["year", "month", "day", "hour", "minute", "second"]) YIELD node AS timeNode
         CALL incrementCounter(timeNode, "count")
 
         CREATE (createTweetNode)-[:createdAt]->(timeNode)
